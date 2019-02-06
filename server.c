@@ -35,6 +35,9 @@ Per progetti misti Unix/Windows e' a scelta quale delle due applicazioni svilupp
 #include <pthread.h>
 #include <errno.h>
 #include <sys/types.h>
+#define MAX_COL 3000
+#define MAX_ROW 3000
+#define MAX_SEA 9000000
 
 void prinf(const char * message){ printf(cver "\n[INFO]\t%s" cbia, message); }
 void prerr(const char * message){ printf(cros "\n[ERR!]\t%s" cbia, message); }
@@ -46,6 +49,53 @@ void eonerror(const char * message)
 	exit(EXIT_FAILURE);
 }
 
+typedef struct reservation
+{
+		int * rseat;
+		int index;
+		struct reservation * prevr;
+		struct reservation * nextr;
+} reservation;
+
+typedef struct cinema
+{
+		int ** seat;
+		struct reservation * firstr;
+		int indexes[MAX_SEA];
+} cinema;
+
+struct reservation * openres(struct reservation * prevres, struct reservation * nextres, struct cinema * cinstr)
+{
+	struct reservation * res;
+	int indx = - 1;
+	int ind;
+	if ((res = malloc(sizeof(struct reservation))) == NULL) eonerror("malloc reservation");
+	for(ind = 0; ind < MAX_SEA; ind++)
+	{
+		if (cinstr->indexes[ind] == 0)
+		{
+			cinstr->indexes[ind] = 1
+			indx = ind;
+			break;
+		}
+	}
+	if (indx == -1) 
+	{
+		free(res);
+		prerr("Impossible to create reservations anymore!");
+		return NULL;
+	}
+	res->index = indx;
+	res->nextr = nextres;
+	res->prevr = prevres;
+	return res;
+}
+
+void serveclient(int fd)
+{
+	prinf("K");
+	if (close(fd) == -1) eonerror("closing socket");
+}
 
 int main(int argc, char *argv[])
 {
@@ -101,7 +151,7 @@ int main(int argc, char *argv[])
 		if (port == 0) port = 4321;
 	}
 	prinf("Port set to value ");
-	printf(cmag "%d", port);
+	printf(cmag "%d\n", port);
 
 	// Checking for saved file
 	/*
@@ -120,12 +170,14 @@ int main(int argc, char *argv[])
    	}
    	*/
    	
-   	chtemp = malloc(sizeof(char) * 8);
+   	if ((chtemp = malloc(sizeof(char) * 8)) == NULL) eonerror("malloc");
+   	
    //	prinf("Stage 1 ok");
+	ccol = crow = 30;
 	while (1 > 0)
    	{
-		printf("\tInsert column size: ");
-		fgets(chtemp, 10, stdin);
+		printf(cbia "\tInsert column size: ");
+		if ((fgets(chtemp, 7, stdin)) == NULL) break;
 		//scanf("%s", chtemp);
 		ccol = strtol(chtemp, NULL, 10);
 		if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid row size");
@@ -136,12 +188,12 @@ int main(int argc, char *argv[])
    	{
 		printf("\tInsert row size: ");
 		//scanf("%s", chtemp);
-		fgets(chtemp, 10, stdin);
+		if ((fgets(chtemp, 7, stdin)) == NULL) break;
 		crow = strtol(chtemp, NULL, 10);
 		if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid row size");
 		else if (crow > 0) break;
 	}
-
+	free(chtemp);
    	prinf("Creating new room with size ");
    	printf(ccia "%dx%d", ccol, crow);
    	
