@@ -131,16 +131,13 @@ struct cinema * initcinema(unsigned int cols, unsigned int rows)
 	res->indexes = index;
 	return res;
 }
-void printcinema(struct cinema * room, unsigned int res_id, int fd)
+
+void printcinema(struct cinema * room, unsigned int res_id)
 {
-	char * tempmsg = calloc(512, sizeof(char));
-	if (tempmsg == NULL) eonerror("calloc printcinema");
-	
-	//snprintf(tempmsg, 511, "\n\tCinema status", fd);
-	
-	if (res_id != 0) snprintf(tempmsg, 511, "\n\tCinema status for reservation id "cver "%d\n\t\t*\tReserved by you" cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved by someone else\n", res_id);
-	else snprintf(tempmsg, 511, "\n\tCinema status" cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved\n" ccia "\n\t\t          ");
-	send_msg(fd, tempmsg);
+	printf(cbia"\n\tCinema status");
+	if (res_id != 0) printf(" for reservation id "cver "%d\n\t\t*\tReserved by you" cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved by someone else\n", res_id);
+	else printf(cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved\n");
+	printf(ccia "\n\t\t          ");
 	unsigned int i;
 	for (i = 10; i< room->cols; i++) printf("%d", i/10);
 	printf(ccia "\n\t\t");
@@ -159,21 +156,21 @@ void printcinema(struct cinema * room, unsigned int res_id, int fd)
 	}
 }
 
-void lindex(char * message, struct cinema * room, int fd)
+void lindex(char * message, struct cinema * room)
 {
 	int val = strtol(message + 1, NULL, 10);
-	printcinema(room, val, fd);
+	printcinema(room, val);
 }
 
 void reserve(char * message, struct cinema * room)
 {
-	unsigned int index;
+
+	int index;
 	int row, col;
 	char * lastchar;
 	char * thischar;
 	index = strtol(message + 1, &thischar, 10);
 	lastchar = thischar;
-	if (index >= (room->cols * room->rows)) return;
 	room->indexes[index] = 1;
 	while (1 > 0)
 	{
@@ -277,151 +274,10 @@ void cancela(char * message, struct cinema * room)
 	prinf("Deleted reservation # "); 
 	printf(cmag "%d" cbia, index);
 }
-void print2cinema(struct cinema * room, unsigned int res_id)
-{
-	printf(cbia"\n\tCinema status");
-	if (res_id != 0) printf(" for reservation id "cver "%d\n\t\t*\tReserved by you" cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved by someone else\n", res_id);
-	else printf(cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved\n");
-	printf(ccia "\n\t\t          ");
-	unsigned int i;
-	for (i = 10; i< room->cols; i++) printf("%d", i/10);
-	printf(ccia "\n\t\t");
-	for (i = 0; i< room->cols; i++) printf("%d", i % 10);
-	unsigned int j, seat;
-	for (i = 0; i < room->rows; i++)
-	{
-		printf(cmag "\n\t%d\t", i);
-		for (j = 0; j < room->cols; j++)
-		{
-			seat = room->seat[i*room->cols + j];
-			if (seat == 0) printf(cbia "_");
-			else if (seat == res_id) printf(cver "*");
-			else printf(cros "#");
-		}
-	}
-}
-
-void l2index(char * message, struct cinema * room)
-{
-	int val = strtol(message + 1, NULL, 10);
-	print2cinema(room, val);
-}
-
-void reserve2(char * message, struct cinema * room)
-{
-	unsigned int index;
-	int row, col;
-	char * lastchar;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	lastchar = thischar;
-	if (index >= (room->cols * room->rows)) return;
-	room->indexes[index] = 1;
-	while (1 > 0)
-	{
-		if (lastchar[0] == '.') break;
-		row = strtol(lastchar + 1, &thischar, 10);
-		col = strtol(thischar + 1, &lastchar, 10);
-		if (room->seat[row * room->cols + col] == 0) room->seat[row * room->cols + col] = index;
-		
-	}
-	prinf("Seats reserved to reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
-void fill2(char * message, struct cinema * room)
-{
-	unsigned int index, places, i = 0;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	places = strtol(thischar + 1, &thischar, 10);
-	room->indexes[index] = 1;
-	while (places > 0)
-	{
-		if (room->seat[i] == 0) 
-		{
-			room->seat[i]= index;
-			places--;
-		}
-		i++;		
-		if (i == room->rows*room->cols) break;
-	}
-	prinf("Seats reserved to reservation # "); 
-	printf(cmag "%d" cbia, index);
-	if (places != 0) prwar("Cinema is full!");
-}
-void unfill2(char * message, struct cinema * room)
-{
-	unsigned int index, places, i = 0;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	places = strtol(thischar + 1, &thischar, 10);
-	room->indexes[index] = 1;
-	while (places > 0)
-	{
-		if (room->seat[i] == index) 
-		{
-			room->seat[i]= 0;
-			places--;
-		}
-		i++;		
-		if (i == room->rows*room->cols) 
-		{
-			room->indexes[index] = 0;
-			prinf("Removing empty reservation # "); 
-			printf(cmag "%d" cbia, index);
-			break;
-		}
-	}
-	prinf("Seats canceled to reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
-void cancels2(char * message, struct cinema * room)
-{
-	unsigned int index,row,col;
-	char * lastchar;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	lastchar = thischar;
-	//printf("\Editing reservation #%d", index, lastchar);
-	room->indexes[index] = 1;
-	while (1 > 0)
-	{
-		if (lastchar[0] == '.') break;
-		row = strtol(lastchar + 1, &thischar, 10);
-		col = strtol(thischar + 1, &lastchar, 10);
-		if (room->seat[row * room->cols + col] == index) room->seat[row * room->cols + col]= 0;
-	}
-	//	reusing row variable as index
-	row = 0;
-	while (1>0)
-	{
-		if (room->seat[row] == index) break; 
-		if (row == room->rows*room->cols) 
-		{
-			room->indexes[index] = 0;
-			prinf("Removing empty reservation # "); 
-			printf(cmag "%d" cbia, index);
-			break;
-		}
-		row++;
-	}
-	prinf("Seats freed from reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
-void cancela2(char * message, struct cinema * room)
-{
-	unsigned int i, index;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	//printf("\Deleting reservation #%d", index);
-	room->indexes[index] = 0;
-	for (i = 0; i < room->cols*room->rows; i++) if (room->seat[i] == index) room->seat[i] = 0;
-	prinf("Deleted reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
 int getindex(struct cinema * room)
 {
-	for(unsigned int i = 1; i < room->cols*room->cols + 1; i++)  if (room->indexes[i] == 0) return i;
+	unsigned int i = 0;
+	while (++i < room->cols*room->cols) if (room->indexes[i] == 0) return i;
 	return 0;
 }
 void serveclient(int fd, struct cinema * room)
@@ -446,7 +302,7 @@ void serveclient(int fd, struct cinema * room)
 		 */
 		  
 		prsoc(tempbuf, fd);
-		if (tempbuf[0] == 'l') lindex(tempbuf, room, fd);
+		if (tempbuf[0] == 'l') lindex(tempbuf, room);
 		if (tempbuf[0] == 'r') reserve(tempbuf, room);
 		if (tempbuf[0] == 'f') fill(tempbuf, room);
 		if (tempbuf[0] == 'c') cancels(tempbuf, room);
@@ -585,8 +441,7 @@ int main(int argc, char * argv[])
     {
 		prwar("An error occurred on bind(). Trying another port");
 		if (port == 65535) port = 65533;
-		port++;
-		servaddr.sin_port = htons(port);
+		servaddr.sin_port = htons(port + 1);
 		if (bind(listsock, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) eonerror("bind error");
 	}	
 	
