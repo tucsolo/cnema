@@ -91,196 +91,7 @@ int recv_line(int sockfd, char *buf, int size)
 	return i;
 }
 
-typedef struct cinema
-{
-		unsigned int rows;
-		unsigned int cols;
-		unsigned int * seat;
-		unsigned int * indexes;
-} cinema;
-
-struct cinema * initcinema(unsigned int cols, unsigned int rows)
-{
-	if ((rows > MAX_ROW)||(cols > MAX_COL)||(rows * cols > MAX_SEA)) eonerror("cinema size exceeded, srsly dunno how");
-	struct cinema * res;
-	if ((res = malloc(sizeof(struct cinema))) == NULL) eonerror("malloc cinema struct");
-	unsigned int * seats = calloc((cols * rows), sizeof(unsigned int));
-	unsigned int * index = calloc((cols * rows + 1), sizeof(unsigned int));
-	//unsigned int * seats = malloc((cols * rows) * sizeof(unsigned int));
-	//unsigned int * index = malloc((cols * rows + 1) * sizeof(unsigned int));
-	/*
-	 * using calloc as it sets memory to zero.
-	 * seat = row * columns + column
-	 * 
-	 * 
-	 * 		-> 	indexes are cols * rows + 1 so
-	 * 			seat[x] = 0 means that seat it's free
-	 * 			seat[x] = n means that seat it's reserved to
-	 * 						reservation n. Could have spared that one
-	 * 						integer but then I should have used -1 or
-	 * 						MAX_COL * MAX_SEA + 1 as free seat value.
-	 *						If you have to optimize this program by
-	 * 						memory usage here you may find some bits
-	 *
-	 */
-	if (seats == NULL) eonerror("malloc cinema seats array");
-	if (index  == NULL) eonerror("malloc cinema index array");
-	res->rows = rows;
-	res->cols = cols;
-	res->seat = seats;
-	res->indexes = index;
-	return res;
-}
-
-void printcinema(struct cinema * room, unsigned int res_id)
-{
-	printf(cbia"\n\tCinema status");
-	if (res_id != 0) printf(" for reservation id "cver "%d\n\t\t*\tReserved by you" cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved by someone else\n", res_id);
-	else printf(cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved\n");
-	printf(ccia "\n\t\t          ");
-	unsigned int i;
-	for (i = 10; i< room->cols; i++) printf("%d", i/10);
-	printf(ccia "\n\t\t");
-	for (i = 0; i< room->cols; i++) printf("%d", i % 10);
-	unsigned int j, seat;
-	for (i = 0; i < room->rows; i++)
-	{
-		printf(cmag "\n\t%d\t", i);
-		for (j = 0; j < room->cols; j++)
-		{
-			seat = room->seat[i*room->cols + j];
-			if (seat == 0) printf(cbia "_");
-			else if (seat == res_id) printf(cver "*");
-			else printf(cros "#");
-		}
-	}
-}
-
-void lindex(char * message, struct cinema * room)
-{
-	int val = strtol(message + 1, NULL, 10);
-	printcinema(room, val);
-}
-
-void reserve(char * message, struct cinema * room)
-{
-
-	int index;
-	int row, col;
-	char * lastchar;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	lastchar = thischar;
-	room->indexes[index] = 1;
-	while (1 > 0)
-	{
-		if (lastchar[0] == '.') break;
-		row = strtol(lastchar + 1, &thischar, 10);
-		col = strtol(thischar + 1, &lastchar, 10);
-		if (room->seat[row * room->cols + col] == 0) room->seat[row * room->cols + col] = index;
-		
-	}
-	prinf("Seats reserved to reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
-void fill(char * message, struct cinema * room)
-{
-	unsigned int index, places, i = 0;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	places = strtol(thischar + 1, &thischar, 10);
-	room->indexes[index] = 1;
-	while (places > 0)
-	{
-		if (room->seat[i] == 0) 
-		{
-			room->seat[i]= index;
-			places--;
-		}
-		i++;		
-		if (i == room->rows*room->cols) break;
-	}
-	prinf("Seats reserved to reservation # "); 
-	printf(cmag "%d" cbia, index);
-	if (places != 0) prwar("Cinema is full!");
-}
-void unfill(char * message, struct cinema * room)
-{
-	unsigned int index, places, i = 0;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	places = strtol(thischar + 1, &thischar, 10);
-	room->indexes[index] = 1;
-	while (places > 0)
-	{
-		if (room->seat[i] == index) 
-		{
-			room->seat[i]= 0;
-			places--;
-		}
-		i++;		
-		if (i == room->rows*room->cols) 
-		{
-			room->indexes[index] = 0;
-			prinf("Removing empty reservation # "); 
-			printf(cmag "%d" cbia, index);
-			break;
-		}
-	}
-	prinf("Seats canceled to reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
-void cancels(char * message, struct cinema * room)
-{
-	unsigned int index,row,col;
-	char * lastchar;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	lastchar = thischar;
-	//printf("\Editing reservation #%d", index, lastchar);
-	room->indexes[index] = 1;
-	while (1 > 0)
-	{
-		if (lastchar[0] == '.') break;
-		row = strtol(lastchar + 1, &thischar, 10);
-		col = strtol(thischar + 1, &lastchar, 10);
-		if (room->seat[row * room->cols + col] == index) room->seat[row * room->cols + col]= 0;
-	}
-	//	reusing row variable as index
-	row = 0;
-	while (1>0)
-	{
-		if (room->seat[row] == index) break; 
-		if (row == room->rows*room->cols) 
-		{
-			room->indexes[index] = 0;
-			prinf("Removing empty reservation # "); 
-			printf(cmag "%d" cbia, index);
-			break;
-		}
-		row++;
-	}
-	prinf("Seats freed from reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
-void cancela(char * message, struct cinema * room)
-{
-	unsigned int i, index;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	//printf("\Deleting reservation #%d", index);
-	room->indexes[index] = 0;
-	for (i = 0; i < room->cols*room->rows; i++) if (room->seat[i] == index) room->seat[i] = 0;
-	prinf("Deleted reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
-int getindex(struct cinema * room)
-{
-	unsigned int i = 0;
-	while (++i < room->cols*room->cols) if (room->indexes[i] == 0) return i;
-	return 0;
-}
-void serveclient(int fd, struct cinema * room)
+void serverconn(int fd)
 {
 	//unsigned int index;
 	prsoc("Hello!", fd);
@@ -317,6 +128,7 @@ void serveclient(int fd, struct cinema * room)
 	}
 	if (close(fd) == -1) eonerror("closing socket");
 }
+
 int main(int argc, char * argv[])
 {
 	struct timeval timeout;
@@ -346,15 +158,11 @@ int main(int argc, char * argv[])
 	//char dialogq;
 	char * chtemp;
 	
-	unsigned int crow;
-	unsigned int ccol;
-	struct cinema * room;
-	
-	prinf("C-nema server loading!");
+	prinf("C-nema client loading!");
 		
-	if (argc > 2) 
+	if ((argc > 3)||(argc < 2)
 	{
-		prerr("Usage: ./server <port>\t Default port if not specified: 4321");
+		prerr("Usage: ./client <server_ip> <port>\n\t Default server if not specified: 127.0.0.1\n\tDefault port if not specified: 4321");
 		eonerror("Too many CLI arguments");
 	}
 	
@@ -368,12 +176,13 @@ int main(int argc, char * argv[])
      * Valid TCP port range: 0 < port < 65536 (and 1-1024 could still fail if not run by root) 
 	 */
 	port = 4321;
-	
-	if (argc == 2)
+	servip = "127.0.0.1"
+	if (argc == 3)
 	{	
-		port = strtol(argv[1], NULL, 10);
+		servip = argv[1];
+		port = strtol(argv[2], NULL, 10);
 		if ((errno == EINVAL) || (errno == ERANGE)) eonerror("Invalid port");
-		if ((port < 0) || (port >= 65536)) eonerror("Port out of range. Valid range: 1 - 65535 (1-1024 only as root)");
+		if ((port < 0) || (port >= 65536)) eonerror("Port out of range. Valid range: 1 - 65535");
 		if (port == 0) port = 4321;
 	}
 	prinf("Port set to value ");
@@ -395,36 +204,6 @@ int main(int argc, char * argv[])
 		printf(cbia "\n\t\tWould you like to use it? [Yn] " cres);
    	}
    	*/
-   	
-   	if ((chtemp = malloc(sizeof(char) * 8)) == NULL) eonerror("malloc");
-   	
-   	ccol = crow = 30;
-   	while (1 > 0)
-   	{
-		printf(cbia "\tInsert column size\t[1 - %d]: ", MAX_COL);
-		if ((fgets(chtemp, 7, stdin)) == NULL) break;
-		ccol = strtol(chtemp, NULL, 10);
-		if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid row size");
-		else if ((ccol > 0)&&(ccol <= MAX_COL)) break;
-	}
-
-   	while (1 > 0)
-   	{
-		printf("\tInsert row size\t\t[1 - %d]: ", MAX_ROW);
-		if ((fgets(chtemp, 7, stdin)) == NULL) break;
-		crow = strtol(chtemp, NULL, 10);
-		if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid row size");
-		else if ((crow > 0)&&(ccol <= MAX_ROW)) break;
-	}
-
-	free(chtemp);
-   	prinf("Creating new room with size ");
-   	printf(ccia "%dx%d", ccol, crow);
-
-   	room = initcinema(ccol, crow);
-
-	prinf("Room with size ");
-   	printf(ccia "%dx%d" cver " created!", room->cols, room->rows);
    	
 	/* setting the listening socket */
 	listsock = socket(AF_INET, SOCK_STREAM, 0);
