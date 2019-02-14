@@ -42,6 +42,13 @@ Per progetti misti Unix/Windows e' a scelta quale delle due applicazioni svilupp
 #define MAX_COL 100
 #define MAX_ROW 100
 #define MAX_SEA 9000000
+#define MAX_THR 3
+
+int thread_count = 0;
+pthread_mutex_t thread_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t thread_cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t maxthread_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t maxthread_cond = PTHREAD_COND_INITIALIZER;
 
 void prinf(const char * message){ printf(cver "\n[INFO]\t%s" cbia, message); }
 void prsoc(const char * message, int fd){ printf(ccia "\n[SOCK]\t%d says <%s>" cbia, fd, message); }
@@ -55,8 +62,9 @@ void eonerror(const char * message)
 }
 ssize_t Readline(int sockd, void *vptr, size_t maxlen)
 {
-	
-    ssize_t n, rc;
+
+    size_t n;
+	ssize_t rc;
     char    c, *buffer;
 
     buffer = vptr;
@@ -150,6 +158,17 @@ typedef struct cinema
 		unsigned int * indexes;
 } cinema;
 
+typedef struct th_data
+{
+		pthread_mutex_t * th_mutex;
+		pthread_cond_t * th_cond;
+		pthread_t th_tid;
+		int fd;
+		struct cinema * mycinema;
+} th_data;
+
+
+
 struct cinema * initcinema(unsigned int cols, unsigned int rows)
 {
 	if ((rows > MAX_ROW)||(cols > MAX_COL)||(rows * cols > MAX_SEA)) eonerror("cinema size exceeded, srsly dunno how");
@@ -223,17 +242,15 @@ void printcinema(struct cinema * room, unsigned int res_id, int fd)
 	}
 	
 }
-
 void lindex(char * message, struct cinema * room, int fd)
 {
 	int val = strtol(message + 1, NULL, 10);
 	printcinema(room, val, fd);
 }
-
 void fill(char * message, struct cinema * room, int fd, int places, unsigned int index)
 {
 	unsigned int i = 0;
-	if (places == 0)
+	if (message != NULL)
 	{
 		char * thischar;
 		index = strtol(message + 1, &thischar, 10);
@@ -345,152 +362,9 @@ void cancela(char * message, struct cinema * room, int fd)
 	unsigned int i, index;
 	char * thischar;
 	index = strtol(message + 1, &thischar, 10);
-	//printf("\Deleting reservation #%d", index);
 	room->indexes[index] = 0;
 	for (i = 0; i < room->cols*room->rows; i++) if (room->seat[i] == index) room->seat[i] = 0;
 	send_msg(fd, "Reservation canceled");
-	prinf("Deleted reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
-void print2cinema(struct cinema * room, unsigned int res_id)
-{
-	printf(cbia"\n\tCinema status");
-	if (res_id != 0) printf(" for reservation id "cver "%d\n\t\t*\tReserved by you" cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved by someone else\n", res_id);
-	else printf(cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved\n");
-	printf(ccia "\n\t\t          ");
-	unsigned int i;
-	for (i = 10; i< room->cols; i++) printf("%d", i/10);
-	printf(ccia "\n\t\t");
-	for (i = 0; i< room->cols; i++) printf("%d", i % 10);
-	unsigned int j, seat;
-	for (i = 0; i < room->rows; i++)
-	{
-		printf(cmag "\n\t%d\t", i);
-		for (j = 0; j < room->cols; j++)
-		{
-			seat = room->seat[i*room->cols + j];
-			if (seat == 0) printf(cbia "_");
-			else if (seat == res_id) printf(cver "*");
-			else printf(cros "#");
-		}
-	}
-}
-
-void l2index(char * message, struct cinema * room)
-{
-	int val = strtol(message + 1, NULL, 10);
-	print2cinema(room, val);
-}
-
-void reserve2(char * message, struct cinema * room)
-{
-	unsigned int index;
-	int row, col;
-	char * lastchar;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	lastchar = thischar;
-	if (index >= (room->cols * room->rows)) return;
-	room->indexes[index] = 1;
-	while (1 > 0)
-	{
-		if (lastchar[0] == '.') break;
-		row = strtol(lastchar + 1, &thischar, 10);
-		col = strtol(thischar + 1, &lastchar, 10);
-		if (room->seat[row * room->cols + col] == 0) room->seat[row * room->cols + col] = index;
-		
-	}
-	prinf("Seats reserved to reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
-void fill2(char * message, struct cinema * room)
-{
-	unsigned int index, places, i = 0;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	places = strtol(thischar + 1, &thischar, 10);
-	room->indexes[index] = 1;
-	while (places > 0)
-	{
-		if (room->seat[i] == 0) 
-		{
-			room->seat[i]= index;
-			places--;
-		}
-		i++;		
-		if (i == room->rows*room->cols) break;
-	}
-	prinf("Seats reserved to reservation # "); 
-	printf(cmag "%d" cbia, index);
-	if (places != 0) prwar("Cinema is full!");
-}
-void unfill2(char * message, struct cinema * room)
-{
-	unsigned int index, places, i = 0;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	places = strtol(thischar + 1, &thischar, 10);
-	room->indexes[index] = 1;
-	while (places > 0)
-	{
-		if (room->seat[i] == index) 
-		{
-			room->seat[i]= 0;
-			places--;
-		}
-		i++;		
-		if (i == room->rows*room->cols) 
-		{
-			room->indexes[index] = 0;
-			prinf("Removing empty reservation # "); 
-			printf(cmag "%d" cbia, index);
-			break;
-		}
-	}
-	prinf("Seats canceled to reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
-void cancels2(char * message, struct cinema * room)
-{
-	unsigned int index,row,col;
-	char * lastchar;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	lastchar = thischar;
-	//printf("\Editing reservation #%d", index, lastchar);
-	room->indexes[index] = 1;
-	while (1 > 0)
-	{
-		if (lastchar[0] == '.') break;
-		row = strtol(lastchar + 1, &thischar, 10);
-		col = strtol(thischar + 1, &lastchar, 10);
-		if (room->seat[row * room->cols + col] == index) room->seat[row * room->cols + col]= 0;
-	}
-	//	reusing row variable as index
-	row = 0;
-	while (1>0)
-	{
-		if (room->seat[row] == index) break; 
-		if (row == room->rows*room->cols) 
-		{
-			room->indexes[index] = 0;
-			prinf("Removing empty reservation # "); 
-			printf(cmag "%d" cbia, index);
-			break;
-		}
-		row++;
-	}
-	prinf("Seats freed from reservation # "); 
-	printf(cmag "%d" cbia, index);
-}
-void cancela2(char * message, struct cinema * room)
-{
-	unsigned int i, index;
-	char * thischar;
-	index = strtol(message + 1, &thischar, 10);
-	//printf("\Deleting reservation #%d", index);
-	room->indexes[index] = 0;
-	for (i = 0; i < room->cols*room->rows; i++) if (room->seat[i] == index) room->seat[i] = 0;
 	prinf("Deleted reservation # "); 
 	printf(cmag "%d" cbia, index);
 }
@@ -518,7 +392,7 @@ void checkzeros(struct cinema * room)
 			e = 0;
 			for( j = 0; j < room->cols*room->rows; j++)
 			{
-				if (room->seat[i] == i)
+				if (room->seat[j] == i)
 				{
 					e = 1; 
 					break;
@@ -530,14 +404,22 @@ void checkzeros(struct cinema * room)
 }
 		
 	
-void serveclient(int fd, struct cinema * room)
+void * serveclient(void * arg)
 {
+	struct th_data * mydata = (struct th_data *) arg;
+	struct cinema * room = mydata->mycinema;
+	int fd = mydata->fd;
 	//unsigned int index;
 	prsoc("Hello!", fd);
 	char tempbuf[512];
+	char tempbuf2[512];
 	while (recv_line(fd, tempbuf, sizeof(tempbuf)) > 0) 
 	{
 		prsoc(tempbuf, fd);
+		snprintf(tempbuf2, 512, "12345aaa");
+		send_msg(fd, tempbuf2);
+
+		if (tempbuf[0] == 'x') break;
 		if (tempbuf[0] == 'h')
 		{
 			snprintf(tempbuf, 512, cbia "\n\t\t***Commands***\n");
@@ -580,29 +462,57 @@ void serveclient(int fd, struct cinema * room)
 		 * h				help
 		 * x				closes connection
 		 */
-
-		if (tempbuf[0] == 'l') lindex(tempbuf, room, fd);
-		if (tempbuf[0] == 'r') reserve(tempbuf, room, fd);
-		if (tempbuf[0] == 'f') fill(tempbuf, room, fd, 0, 0);
-		if (tempbuf[0] == 'c') cancels(tempbuf, room, fd);
-		if (tempbuf[0] == 'd') cancela(tempbuf, room, fd);
-		if (tempbuf[0] == 'u') unfill(tempbuf, room, fd);
-		if (tempbuf[0] == 'z') checkzeros(room);
-		if (tempbuf[0] == 'i')
+		else
 		{
-			snprintf(tempbuf, 512, "%d", getindex(room));
-			send_msg(fd, tempbuf);
+			pthread_mutex_lock(&thread_mutex);
+			if (tempbuf[0] == 'l') lindex(tempbuf, room, fd);
+			if (tempbuf[0] == 'r') reserve(tempbuf, room, fd);
+			if (tempbuf[0] == 'f') fill(tempbuf, room, fd, 0, 0);
+			if (tempbuf[0] == 'c') cancels(tempbuf, room, fd);
+			if (tempbuf[0] == 'd') cancela(tempbuf, room, fd);
+			if (tempbuf[0] == 'u') unfill(tempbuf, room, fd);
+			if (tempbuf[0] == 'z') checkzeros(room);
+			if (tempbuf[0] == 'i')
+			{
+				snprintf(tempbuf, 512, "%d", getindex(room));
+				send_msg(fd, tempbuf);
+			}
+			if (tempbuf[0] == 'y')
+			{
+				snprintf(tempbuf, 512, "%d", lockindex(room));
+				send_msg(fd, tempbuf);
+			}
+			pthread_mutex_unlock(&thread_mutex);
 		}
-		if (tempbuf[0] == 'y')
-		{
-			snprintf(tempbuf, 512, "%d", lockindex(room));
-			send_msg(fd, tempbuf);
-		}
-		if (tempbuf[0] == 'x') break;
-		send_msg(fd, "\n\r\r\r");
+		snprintf(tempbuf2, 512, "12345aaa");
+		send_msg(fd, tempbuf2);
+		//snprintf(tempbuf, 512, "\n\r\r\r");
+		//send_msg(fd, tempbuf);
 	}
 	if (close(fd) == -1) eonerror("closing socket");
+	free(arg);
+	thread_count--;
+	pthread_cond_signal(&maxthread_cond);
+	pthread_mutex_unlock(&maxthread_mutex);
+	return 0;
 }
+
+void thread_spawn(struct th_data * arg, struct cinema * room)
+{
+	pthread_attr_t attr;
+	arg->mycinema = room;
+	arg->th_cond = &thread_cond;
+	arg->th_mutex = &thread_mutex;
+	//arg->ctmutex = &chsxth;
+	//arg->ctcond = &cond;
+	//arg->messagep = peermsg;
+	if ((pthread_attr_init(&attr)) != 0) eonerror("pthread_attr_init fail");
+	if ((pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED)) != 0) eonerror("pthread_attr_setdetachstate() fail");
+	if ((pthread_create(&(arg->th_tid), &attr, &serveclient, arg)) != 0) eonerror("Error in pthread_create");
+	if ((pthread_attr_destroy(&attr)) != 0) eonerror ("Error in pthread_attr_destroy()");
+	return;
+}
+
 int main(int argc, char * argv[])
 {
 	struct timeval timeout;
@@ -626,6 +536,7 @@ int main(int argc, char * argv[])
 	int backlog = 0;
 	int socket_fd;
 	
+	struct th_data * new_thdata;
 	//client_t_struct *tmp;	
 	//pthread_t tid;
 	
@@ -756,6 +667,7 @@ int main(int argc, char * argv[])
 	printf(ccia "%d\n", port);
 	while (1 > 0)
 	{
+		if (thread_count >= MAX_THR) pthread_cond_wait(&maxthread_cond, &maxthread_mutex);
 		prinf("Awaiting connections");
 
 		//tmp = alloc_tstruct();
@@ -766,8 +678,14 @@ int main(int argc, char * argv[])
 		//if (tmp->fd < 0) eonerror("accept");
 		//pthread_create(&tid, NULL, chanserv_function, (void *)tmp);
 		prinf("Connection incoming!");
-		serveclient(socket_fd, room);
-		prinf("Connection closed!");
+		//serveclient(socket_fd, room);
+		new_thdata = malloc(sizeof(struct th_data));
+		if (new_thdata == NULL) eonerror("malloc thread data struct");
+		new_thdata->fd = socket_fd;
+		thread_count++;
+		thread_spawn(new_thdata, room);		
+		//prinf("Connection closed!");
+		
 	}
 	return 0;		
 }
