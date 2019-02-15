@@ -42,7 +42,7 @@ Per progetti misti Unix/Windows e' a scelta quale delle due applicazioni svilupp
 #define MAX_COL 100
 #define MAX_ROW 100
 #define MAX_SEA 9000000
-#define MAX_THR 3
+#define MAX_THR 3000
 
 int thread_count = 0;
 pthread_mutex_t thread_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -416,8 +416,8 @@ void * serveclient(void * arg)
 	while (recv_line(fd, tempbuf, sizeof(tempbuf)) > 0) 
 	{
 		prsoc(tempbuf, fd);
-		snprintf(tempbuf2, 512, "12345aaa");
-		send_msg(fd, tempbuf2);
+		//snprintf(tempbuf2, 512, "321\n");
+		//if (buffer2[0] == '\0') exit(EXIT_SUCCESS);if (buffer2[0] == '\0') exit(EXIT_SUCCESS);send_msg(fd, tempbuf2);
 
 		if (tempbuf[0] == 'x') break;
 		if (tempbuf[0] == 'h')
@@ -484,11 +484,12 @@ void * serveclient(void * arg)
 			}
 			pthread_mutex_unlock(&thread_mutex);
 		}
-		snprintf(tempbuf2, 512, "12345aaa");
+		snprintf(tempbuf2, 512, "\r");
 		send_msg(fd, tempbuf2);
 		//snprintf(tempbuf, 512, "\n\r\r\r");
 		//send_msg(fd, tempbuf);
 	}
+	prsoc("Bye!", fd);
 	if (close(fd) == -1) eonerror("closing socket");
 	free(arg);
 	thread_count--;
