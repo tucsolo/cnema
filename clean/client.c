@@ -103,7 +103,6 @@ void getanswer(char * command, int fd)
 	}
 	if (command[0] == 'x') exit(EXIT_SUCCESS);
 }
-
 int mainmenu(int resno, int fd)
 {
 	int seats;
@@ -114,7 +113,7 @@ int mainmenu(int resno, int fd)
 	chtemp[0] = 'p';
 	if (resno == -1) 
 	{
-		printf(ccia"\n\t\t/----------------/\n\t\t|" cbia "C-NEMA Main Menu" ccia"|\n\t\t/----------------/\n" cbia "\nActually you're not working on a particular reservation id.\n\tWhat do you want to do?" ccia "\n\n\t[1]\tShow cinema status" cver "\n\t[2]\tWork on an existent reservation id" cgia"\n\t[3]\tOpen a new reservation" cmag "\n\t[4]\tClean up empty reservation ids" cbia "\n\n\t[5]\tExit from this client\n");
+		printf(ccia"\n\t\t*------------------*\n\t\t|" cbia " C-NEMA Main Menu " ccia"|\n\t\t*------------------*\n" cbia "\n\tActually you're not working on a particular reservation id.\n\tWhat do you want to do?" ccia "\n\n\t[1]\tShow cinema status" cver "\n\t[2]\tWork on an existent reservation id" cgia"\n\t[3]\tOpen a new reservation" cmag "\n\t[4]\tClean up empty reservation ids" cbia "\n\n\t[5]\tExit from this client\n");
 		
 		while (1 > 0)
 		{
@@ -142,7 +141,7 @@ int mainmenu(int resno, int fd)
 	if ((command == 0) && (resno != -1))
 	{
 		//printf("OK");
-		printf(cbia"\n\tYou're working on reservation" cver" #%d"cbia"\n\n\t. What do you want to do about that?" ccia "\n\n\t[1]\tShow reserved seats" cver "\n\t[2]\tReserve specific seats\n\t[3]\tReserve some seats" cgia "\n\t[4]\tFree specific seats\n\t[5]\tFree some seats"cmag "\n\t[6]\tDelete this reservation\n\n\t" cbia "[7]\tGo back to main menu", resno);
+		printf(cbia"\n\tYou're working on reservation" cver" #%d"cbia".\n\n\tWhat do you want to do about that?" ccia "\n\n\t[1]\tShow reserved seats" cver "\n\t[2]\tReserve specific seats\n\t[3]\tReserve some seats" cgia "\n\t[4]\tFree specific seats\n\t[5]\tFree some seats"cmag "\n\t[6]\tDelete this reservation\n\n\t" cbia "[7]\tGo back to main menu", resno);
 		while (1 > 0)
 		{
 			printf(cbia"\nC-NEMA :> ");
@@ -222,10 +221,10 @@ int mainmenu(int resno, int fd)
 			char chtemp2[50];
 			unsigned int nseats = 0;
 			snprintf(chtemp, 512, "c%d", resno);
-			int row = -1;
-			int col = -1;
 			while (1 > 0)
 			{
+				int row = -1;
+				int col = -1;
 				printf("\nRemoving seat reservation #%d", nseats + 1);
 				while (1 > 0)
 					{
@@ -281,7 +280,6 @@ int mainmenu(int resno, int fd)
 	getanswer(chtemp, fd);
 	return resno;
 }
-
 int main(int argc, char *argv[])
 {
     int       conn_s;                /*  connection socket         */
@@ -352,12 +350,12 @@ int main(int argc, char *argv[])
 
 
 int a = -1;
-int b = fork();
-if (b == 0) while(1 > 0)
+//int b = fork();
+/*if (b == 0) while(1 > 0)
 {
 	sleep(10);
 	Writeline(conn_s, "Ping!\n", 6);
-}
+}*/
 while(1 > 0) a = mainmenu(a, conn_s);
 prwar("Server closed or not responding, exiting.");
 exit(EXIT_FAILURE);

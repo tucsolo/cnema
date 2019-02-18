@@ -267,10 +267,17 @@ void fill(char * message, struct cinema * room, int fd, int places, unsigned int
 		i++;		
 		if (i == room->rows*room->cols) break;
 	}
-	send_msg(fd, "Seats reserved!" );
-	prinf("Seats reserved to reservation # "); 
-	printf(cmag "%d" cbia, index);
-	if (places != 0) prwar("Cinema is full!");
+	if (places != 0) 
+	{
+		prwar("Cinema is full!");
+		send_msg(fd, "\nWarning - Cinema is full!" );
+	}
+	if (i != 0)
+	{
+		send_msg(fd, "\nSeats filled!" );
+		prinf("Seats reserved to reservation # "); 
+		printf(cmag "%d" cbia, index);
+	}
 }
 int reserve(char * message, struct cinema * room, int fd)
 {
@@ -293,10 +300,11 @@ int reserve(char * message, struct cinema * room, int fd)
 			else if (room->seat[row * room->cols + col] != index) rem++;
 		}
 	}
-	//send_msg(fd, "Seats reserved!");
-	prinf("Seats reserved to reservation # "); 
+	send_msg(fd, "Seats reserved!");
+	prinf("Seats booked to reservation #"); 
 	printf(cmag "%d" cbia, index);
 	if (rem > 0) fill(NULL, room, fd, rem, index);
+	send_msg(fd, " Some seats were unavailable and you have been filled");
 	return rem;
 }
 void unfill(char * message, struct cinema * room, int fd)
