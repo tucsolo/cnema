@@ -287,8 +287,11 @@ int reserve(char * message, struct cinema * room, int fd)
 		if (lastchar[0] == '.') break;
 		row = strtol(lastchar + 1, &thischar, 10);
 		col = strtol(thischar + 1, &lastchar, 10);
-		if (room->seat[row * room->cols + col] == 0) room->seat[row * room->cols + col] = index;
-		else if (room->seat[row * room->cols + col] != index) rem++;
+		if ((row <= MAX_ROW)&&(col <= MAX_COL))
+		{
+			if (room->seat[row * room->cols + col] == 0) room->seat[row * room->cols + col] = index;
+			else if (room->seat[row * room->cols + col] != index) rem++;
+		}
 	}
 	//send_msg(fd, "Seats reserved!");
 	prinf("Seats reserved to reservation # "); 
@@ -373,6 +376,13 @@ int getindex(struct cinema * room)
 	for(unsigned int i = 1; i < room->cols*room->cols + 1; i++)  if (room->indexes[i] == 0) return i;
 	return 0;
 }
+int getindexinfo(char * message, struct cinema * room)
+{
+	unsigned int index = 0;
+	char * thischar;
+	index = strtol(message + 1, &thischar, 10);
+	return room->indexes[index];
+}
 int lockindex(struct cinema * room)
 {
 	for(unsigned int i = 1; i < room->cols*room->cols + 1; i++)  if (room->indexes[i] == 0) 
@@ -413,14 +423,14 @@ void * serveclient(void * arg)
 	prsoc("Hello!", fd);
 	char tempbuf[512];
 	char tempbuf2[512];
-	while (recv_line(fd, tempbuf, sizeof(tempbuf)) > 0) 
+	while (recv_line(fd, tempbuf2, sizeof(tempbuf)) > 0) 
 	{
-		prsoc(tempbuf, fd);
+		prsoc(tempbuf2, fd);
 		//snprintf(tempbuf2, 512, "321\n");
 		//if (buffer2[0] == '\0') exit(EXIT_SUCCESS);if (buffer2[0] == '\0') exit(EXIT_SUCCESS);send_msg(fd, tempbuf2);
 
-		if (tempbuf[0] == 'x') break;
-		if (tempbuf[0] == 'h')
+		if (tempbuf2[0] == 'x') break;
+		if (tempbuf2[0] == 'h')
 		{
 			snprintf(tempbuf, 512, cbia "\n\t\t***Commands***\n");
 			send_msg(fd, tempbuf);
@@ -447,7 +457,8 @@ void * serveclient(void * arg)
 		}
 		/*	
 		 * 
-		 * lI				
+		 * lI				prints cinema
+		 * gI				sends 0 if index is available, 1 if it's *					reserved		
 		 * i				prints first available index
 		 * y				prints first available index (and reserves
 		 * 					it)
@@ -465,33 +476,46 @@ void * serveclient(void * arg)
 		else
 		{
 			pthread_mutex_lock(&thread_mutex);
-			if (tempbuf[0] == 'l') lindex(tempbuf, room, fd);
-			if (tempbuf[0] == 'r') reserve(tempbuf, room, fd);
-			if (tempbuf[0] == 'f') fill(tempbuf, room, fd, 0, 0);
-			if (tempbuf[0] == 'c') cancels(tempbuf, room, fd);
-			if (tempbuf[0] == 'd') cancela(tempbuf, room, fd);
-			if (tempbuf[0] == 'u') unfill(tempbuf, room, fd);
-			if (tempbuf[0] == 'z') checkzeros(room);
-			if (tempbuf[0] == 'i')
+			if (tempbuf2[0] == 'l') lindex(tempbuf2, room, fd);
+			if (tempbuf2[0] == 'r') reserve(tempbuf2, room, fd);
+			if (tempbuf2[0] == 'f') fill(tempbuf2, room, fd, 0, 0);
+			if (tempbuf2[0] == 'c') cancels(tempbuf2, room, fd);
+			if (tempbuf2[0] == 'd') cancela(tempbuf2, room, fd);
+			if (tempbuf2[0] == 'u') unfill(tempbuf2, room, fd);
+			if (tempbuf2[0] == 'z') checkzeros(room);
+			if (tempbuf2[0] == 'i')
 			{
 				snprintf(tempbuf, 512, "%d", getindex(room));
 				send_msg(fd, tempbuf);
 			}
-			if (tempbuf[0] == 'y')
+			if (tempbuf2[0] == 'y')
 			{
 				snprintf(tempbuf, 512, "%d", lockindex(room));
 				send_msg(fd, tempbuf);
 			}
+			if (tempbuf2[0] == 'g')
+			{
+				snprintf(tempbuf, 512, "%d", getindexinfo(tempbuf2, room));
+				send_msg(fd, tempbuf);
+			}
 			pthread_mutex_unlock(&thread_mutex);
 		}
-		snprintf(tempbuf2, 512, "\r");
-		send_msg(fd, tempbuf2);
+		snprintf(tempbuf, 512, "\n");
+		send_msg(fd, tempbuf);
+		snprintf(tempbuf, 512, "\r");
+		send_msg(fd, tempbuf);
 		//snprintf(tempbuf, 512, "\n\r\r\r");
 		//send_msg(fd, tempbuf);
 	}
 	prsoc("Bye!", fd);
+	snprintf(tempbuf2, 512, "\n");
+	send_msg(fd, tempbuf2);
+	snprintf(tempbuf2, 512, "\r");
+	send_msg(fd, tempbuf2);
 	if (close(fd) == -1) eonerror("closing socket");
 	free(arg);
+	pthread_mutex_lock(&maxthread_mutex);
+
 	thread_count--;
 	pthread_cond_signal(&maxthread_cond);
 	pthread_mutex_unlock(&maxthread_mutex);
@@ -578,7 +602,8 @@ int main(int argc, char * argv[])
 	else
 	{
 		port = 4321;
-		prinf("Port set to default value 4321. To change it, launch this server with ./server <port>");
+		prinf("Port set to default value 4321.");
+		prinf("To change it, launch this server with ./server <port>\n");
 	}	
 	
 

@@ -30,7 +30,7 @@
 
 /*  Global constants  */
 
-#define MAX_LINE 1024
+#define MAX_LINE 100
 
 
 /*  main()  */
@@ -47,51 +47,38 @@ void eonerror(const char * message)
 }
 int getfreeid(int fd)
 {
-	int exr;
 	int outid = 0;
-	char buffer2[50];
-	Writeline(fd, "y\n", 2);
+	char * buffer2;
+	buffer2 = malloc(sizeof(char) * MAX_LINE);
+	if (buffer2 == NULL) eonerror("malloc on temp char");
+	Writeline(fd, "y\n", 3);
     while(1 > 0)
 	{
-		exr = recv_line(fd, buffer2, MAX_LINE);
+		if ((recv_line(fd, buffer2, MAX_LINE)) == -1) break;
 		outid = strtol(buffer2, NULL, 10);
 		if ((errno == EINVAL) || (errno == ERANGE)) eonerror("Error getting a reservation id");
-		if (exr == -1) break;
 	}
 	return outid;
 
 }
 int getidinfo(int fd, int id)
 {
-	//printf("fd = %d id = %d", fd, id);
-	int i = 0;
-	int exr;
-	unsigned int outid = 0;
-	char buffer2[100];
-	//strcpy(buffer2, "g1");
-	snprintf(buffer2, 100, "g%u\n", id);
-	/*for(i = 0; i<sizeof(buffer2); i++) if (buffer2[i] == '.') 
-	{
-		buffer2[i] = '\0';
-		break;
-	}
-		
-	printf("\n#%s# size %d", buffer2, i);
-	*/
-	Writeline(fd, buffer2, strlen(buffer2));
+	int outid = 0;
+	char * buffer2;
+	buffer2 = malloc(sizeof(char) * MAX_LINE);
+	if (buffer2 == NULL) eonerror("malloc on temp char");
+	snprintf(buffer2, MAX_LINE, "g%d\n", id);
+	Writeline(fd, buffer2, sizeof(buffer2));
     while(1 > 0)
 	{
-		exr = recv_line(fd, buffer2, MAX_LINE);
-		if (outid == 0) outid = strtol(buffer2, NULL, 10);
+		if ((recv_line(fd, buffer2, MAX_LINE)) == -1) break;
+		outid = strtol(buffer2, NULL, 10);
 		if ((errno == EINVAL) || (errno == ERANGE)) eonerror("Error getting reservation id's info");
-		if (exr == -1) break;
 	}
-	//printf("outid = %d", outid);
 	return outid;
 }
 int getanswer(char * command, int fd)
 {
-	int exr;
 	char * buffer2;
 	buffer2 = calloc(MAX_LINE, sizeof(char));
 	if (buffer2 == NULL) eonerror("malloc on temp char");
@@ -103,12 +90,12 @@ int getanswer(char * command, int fd)
 	//Writeline(fd, "l\n", 2);
 	while(1 > 0)
 	{
-		//printf("loop");
+		printf("loop");
 		
-		exr = recv_line(fd, buffer2, MAX_LINE);
+		recv_line(fd, buffer2, MAX_LINE);
 		printf("%s",buffer2);
-		//printf("%c",buffer2[0]);
-		if (exr == -1) break;
+		printf("%c",buffer2[0]);
+		//if (buffer2[0] == '\0') break;
 	}
 	if (command[0] == 'x') exit(EXIT_SUCCESS);
 }
@@ -117,44 +104,46 @@ int mainmenu(int resno, int fd)
 {
 	int seats;
 	char * chtemp;
-	int command = 0;
-	chtemp = calloc(512, sizeof(char));
+	int command;
+	chtemp = malloc(sizeof(char) * 512);
 	if (chtemp == NULL) eonerror("malloc on temp char");
 	chtemp[0] = 'p';
 	if (resno == -1) 
 	{
-		printf(ccia"\n\t\t/----------------/\n\t\t|" cbia "C-NEMA Main Menu" ccia"|\n\t\t/----------------/\n" cbia "\nActually you're not working on a particular reservation id.\n\tWhat do you want to do?" ccia "\n\n\t[1]\tShow cinema status" cver "\n\t[2]\tWork on an existent reservation id" cgia"\n\t[3]\tOpen a new reservation" cmag "\n\t[4]\tClean up empty reservation ids" cbia "\n\n\t[5]\tExit from this client\n");
+		printf(ccia"\n/-------------------/\n|" cbia "C-NEMA client here!" ccia"|\n/-------------------/\n" cbia "\nActually you're not working on a particular reservation id.\nWhat do you want to do?" ccia "\n\n\t[1]\tShow cinema status" cver "\n\t[2]\tWork on an existent reservation id" cgia"\n\t[3]\tOpen a new reservation" cmag "\n\n\t[4]\tExit from this client");
 		
 		while (1 > 0)
 		{
-			printf(cbia"\nC-NEMA :> ");
+			printf(cbia"\n\t]");
 			if ((fgets(chtemp, 7, stdin)) == NULL) prerr("Invalid command");
 			command = strtol(chtemp, NULL, 10);
 			if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid command");
 			else if ((command > 0)&&(command <= 4)) break;
 		}
-		//printf("\nCommand:%d Resno:%d", command, resno);
-		if (command == 3) return getfreeid(fd);
+		if (command == 4) strcpy(chtemp, "x\n");
+		if (command == 1) strcpy(chtemp, "l\n");
+		if (command == 3) resno = getfreeid(fd);
 		if (command == 2) while (1 > 0)
 		{
 			printf(cbia "\nInsert reservation id: ");
 			if ((fgets(chtemp, 7, stdin)) == NULL) prerr("Invalid resource id");
 			resno = strtol(chtemp, NULL, 10);
-			printf("\n%s-%d", chtemp, resno);
 			if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid resource id");
 			if (getidinfo(fd, resno) == 0) prerr("Resource id not valid!");
-			else return resno;
+			else break;
 		}
-		//printf("\nCommand:%d resno:%d", command, resno);
 	}
-	//printf("\nCommand:%d RESNO:%d", command, resno);
-	if ((command == 0) && (resno != -1))
+	if (chtemp[0] != 'p') getanswer(chtemp, fd);
+	else
 	{
-		//printf("OK");
-		printf(cbia"\n\tYou're working on reservation" cver" #%d"cbia"\n\n\t. What do you want to do about that?" ccia "\n\n\t[1]\tShow reserved seats" cver "\n\t[2]\tReserve specific seats\n\t[3]\tReserve some seats" cgia "\n\t[4]\tFree specific seats\n\t[5]\tFree some seats"cmag "\n\t[6]\tDelete this reservation\n\n\t" cbia "[7]\tGo back to main menu", resno);
 		while (1 > 0)
 		{
-			printf(cbia"\nC-NEMA :> ");
+			if (getidinfo(fd, resno) == 0) 
+			{
+				printf(cmag "Reservation #%d not valid anymore (maybe because no more seats were reserved), exiting", resno);
+				return -1;
+			}
+			printf(cbia"\nYou're working on reservation #%d. What do you want to do about that?" ccia "\n\n\t[1]\tShow reserved seats" cver "\n\t[2]\tReserve specific seats\n\t[3]\tReserve some seats" cgia "\n\t[4]Free specific seats\n\t[5]Free some seats"cmag "\n\t[6]\tDelete this reservation\n\n\t" cbia "[7]Go back to main menu", resno);
 			if ((fgets(chtemp, 7, stdin)) == NULL) prerr("Invalid command");
 			command = strtol(chtemp, NULL, 10);
 			if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid command");
@@ -163,53 +152,17 @@ int mainmenu(int resno, int fd)
 		if (command == 7) return -1;
 		if (command == 6) 
 		{
-			snprintf(chtemp, 512, "d%d\n", resno);
+			snprintf(chtemp, 512, "d%d", resno);
 			getanswer(chtemp, fd);
 			return -1;
 		}
 		if (command == 1) 
 		{
-			snprintf(chtemp, 512, "l%d\n", resno);
+			snprintf(chtemp, 512, "l%d", resno);
 			getanswer(chtemp, fd);
-			return resno;
 		}
 		if (command == 2) //Reserve
 		{
-			char chtemp2[50];
-			unsigned int nseats = 0;
-			snprintf(chtemp, 512, "r%d", resno);
-
-			while (1 > 0)
-			{
-				int row = -1;
-				int col = -1;
-				printf("\nBooking seat #%d", nseats + 1);
-				while (1 > 0)
-					{
-						printf(cbia"\n[Q to exit] Row\t: ");
-						if ((fgets(chtemp2, 7, stdin)) == NULL) prerr("Invalid command");
-						if ((chtemp2[0] == 'Q')|| (chtemp2[0] == 'q')) break;
-						row = strtol(chtemp2, NULL, 10);
-						if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid command");
-						if (row >= 0) break;
-					}
-					if (row != -1) while (1 > 0)
-					{
-						printf(cbia"\n[Q to exit] Column\t: ");
-						if ((fgets(chtemp2, 7, stdin)) == NULL) prerr("Invalid command");
-						if ((chtemp2[0] == 'Q')|| (chtemp2[0] == 'q')) break;
-						col = strtol(chtemp2, NULL, 10);
-						if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid command");
-						if (col >= 0) break;
-					}
-			if ((row == -1)||(col == -1)) break;
-			nseats++;
-			snprintf(chtemp2, 512, ",%d,%d", row,col);
-			chtemp = strcat(chtemp, chtemp2);
-			}
-			chtemp = strcat(chtemp, ".\n");
-			getanswer(chtemp, fd);
-			return resno;
 		}
 		if (command == 3) //Fill
 		{
@@ -222,46 +175,11 @@ int mainmenu(int resno, int fd)
 				if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid resource id");
 				if (seats > -1) break;
 			}
-		snprintf(chtemp, 512, "f%d,%d\n", resno, seats);
+		snprintf(chtemp, 512, "f%d,%d", resno, seats);
 		getanswer(chtemp, fd);
-		return resno;
 		}
 		if (command == 4) //Cancel
 		{
-			char chtemp2[50];
-			unsigned int nseats = 0;
-			snprintf(chtemp, 512, "c%d", resno);
-			int row = -1;
-			int col = -1;
-			while (1 > 0)
-			{
-				printf("\nRemoving seat reservation #%d", nseats + 1);
-				while (1 > 0)
-					{
-						printf(cbia"\n[Q to exit] Row\t: ");
-						if ((fgets(chtemp2, 7, stdin)) == NULL) prerr("Invalid command");
-						if ((chtemp2[0] == 'Q')|| (chtemp2[0] == 'q')) break;
-						row = strtol(chtemp2, NULL, 10);
-						if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid command");
-						if (row >= 0) break;
-					}
-					if (row != -1) while (1 > 0)
-					{
-						printf(cbia"\n[Q to exit] Column\t: ");
-						if ((fgets(chtemp2, 7, stdin)) == NULL) prerr("Invalid command");
-						if ((chtemp2[0] == 'Q')|| (chtemp2[0] == 'q')) break;
-						col = strtol(chtemp2, NULL, 10);
-						if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid command");
-						if (col >= 0) break;
-					}
-			if ((row == -1)||(col == -1)) break;
-			nseats++;
-			snprintf(chtemp2, 512, ",%d,%d", row,col);
-			chtemp = strcat(chtemp, chtemp2);
-			}
-			chtemp = strcat(chtemp, ".\n");
-			getanswer(chtemp, fd);
-			return resno;
 		}
 		if (command == 5) //unFill
 		{
@@ -274,21 +192,11 @@ int mainmenu(int resno, int fd)
 				if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid resource id");
 				if (seats > -1) break;
 			}
-		snprintf(chtemp, 512, "u%d,%d\n", resno, seats);
+		snprintf(chtemp, 512, "u%d,%d", resno, seats);
 		getanswer(chtemp, fd);
-		return resno;
 		}
-		if (getidinfo(fd, resno) == 0) 
-		{
-			printf(cmag "Reservation #%d not valid anymore (maybe because no more seats were reserved), exiting", resno);
-				return -1;
-		}
+			
 	}
-	if (command == 5) strcpy(chtemp, "x\n");
-	if (command == 4) strcpy(chtemp, "z\n");
-	if (command == 1) strcpy(chtemp, "l\n");
-	getanswer(chtemp, fd);
-	return resno;
 }
 
 int main(int argc, char *argv[])
