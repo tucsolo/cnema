@@ -60,6 +60,56 @@ void eonerror(const char * message)
 	perror(message);
 	exit(EXIT_FAILURE);
 }
+
+//void ParseCmdLine(int argc, char *argv[], unsigned int * port, unsigned int * row, unsigned int * col, char * infile, char * outfile)
+void ParseCmdLine(int argc, char *argv[], unsigned int * port, unsigned int * row, unsigned int * col)
+{
+    int n = 1;
+	*row = 0;
+	*col = 0;
+	*port = 0;
+    while ( n < argc )
+	{
+		if ( !strncmp(argv[n], "-r", 2) || !strncmp(argv[n], "-R", 2) ) 
+		{
+			*row = strtol(argv[++n], NULL, 10);
+			if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid row size");
+			if (*row > MAX_ROW) *row = 0;
+		}
+		else if ( !strncmp(argv[n], "-c", 2) || !strncmp(argv[n], "-C", 2) ) 
+		{
+			*col = strtol(argv[++n], NULL, 10);
+			if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid row size");
+			if (*col > MAX_COL) *col = 0;
+		}
+		else if ( !strncmp(argv[n], "-s", 2) || !strncmp(argv[n], "-S", 2) ) 
+		{
+			*col = strtol(argv[++n], NULL, 10);
+			if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid row size");
+			if ((*col > MAX_COL)||(*col > MAX_ROW)) *col = 0;
+			*row = *col;
+		}
+		//else if ( !strncmp(argv[n], "-o", 2) || !strncmp(argv[n], "-O", 2) ) outfile = argv[++n]
+		//else if ( !strncmp(argv[n], "-i", 2) || !strncmp(argv[n], "-I", 2) ) infile = argv[++n]
+		if ( !strncmp(argv[n], "-p", 2) || !strncmp(argv[n], "-P", 2) ) 
+		{
+			*port = strtol(argv[++n], NULL, 10);
+			if ((errno == EINVAL) || (errno == ERANGE)) eonerror("Invalid port");
+			if (*port >= 65536) eonerror("Port out of range. Valid range: 1 - 65535 (1-1024 only as root)");
+			if (*port == 0) *port = 4321;
+			prinf("Port set to value ");
+			printf(ccia "%d\n", *port);
+		}
+		else if ( !strncmp(argv[n], "-h", 2) || !strncmp(argv[n], "-H", 2) )
+				{
+		    		prinf("\tUsage:");
+			    	prinf("\t\t./server [-r <row size> -c <column size> | -s <side>] -p <port> [-h]\n\n");
+			    	exit(EXIT_SUCCESS);
+				}
+		++n;
+    }
+}
+
 ssize_t Readline(int sockd, void *vptr, size_t maxlen)
 {
 
@@ -205,9 +255,6 @@ void printcinema(struct cinema * room, unsigned int res_id, int fd)
 {
 	char * tempmsg = calloc(512, sizeof(char));
 	if (tempmsg == NULL) eonerror("calloc printcinema");
-	
-	//snprintf(tempmsg, 511, "\n\tCinema status", fd);
-	
 	if (res_id != 0) snprintf(tempmsg, 511, "\n\tCinema status for reservation id "cver "%d\n\t\t*\tReserved by you" cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved by someone else\n", res_id);
 	else snprintf(tempmsg, 511, "\n\tCinema status" cbia "\n\t\t_\tFree" cros "\n\t\t#\tReserved\n");
 	send_msg(fd, tempmsg);
@@ -341,7 +388,6 @@ void cancels(char * message, struct cinema * room, int fd)
 	char * thischar;
 	index = strtol(message + 1, &thischar, 10);
 	lastchar = thischar;
-	//printf("\Editing reservation #%d", index, lastchar);
 	room->indexes[index] = 1;
 	while (1 > 0)
 	{
@@ -427,15 +473,12 @@ void * serveclient(void * arg)
 	struct th_data * mydata = (struct th_data *) arg;
 	struct cinema * room = mydata->mycinema;
 	int fd = mydata->fd;
-	//unsigned int index;
 	prsoc("Hello!", fd);
 	char tempbuf[512];
 	char tempbuf2[512];
 	while (recv_line(fd, tempbuf2, sizeof(tempbuf)) > 0) 
 	{
 		prsoc(tempbuf2, fd);
-		//snprintf(tempbuf2, 512, "321\n");
-		//if (buffer2[0] == '\0') exit(EXIT_SUCCESS);if (buffer2[0] == '\0') exit(EXIT_SUCCESS);send_msg(fd, tempbuf2);
 
 		if (tempbuf2[0] == 'x') break;
 		if (tempbuf2[0] == 'h')
@@ -463,24 +506,6 @@ void * serveclient(void * arg)
 			snprintf(tempbuf, 512, cbia "\n\tx\t\tCloses connection\n\n");
 			send_msg(fd, tempbuf);
 		}
-		/*	
-		 * 
-		 * lI				prints cinema
-		 * gI				sends 0 if index is available, 1 if it's *					reserved		
-		 * i				prints first available index
-		 * y				prints first available index (and reserves
-		 * 					it)
-		 *
-		 * rI,R,C,R,[...].	reserves seats Row.Column [...] to Index
-		 * fI,N				reserves N seats for index I
-		 * 
-		 * cI,R,C,R,[...].  cancels reservation for seats R.C to Index
-		 * uI,N				cancels reservation for N seats to Index
-		 * dI				cancels entire reservation Index
-		 * 
-		 * h				help
-		 * x				closes connection
-		 */
 		else
 		{
 			pthread_mutex_lock(&thread_mutex);
@@ -512,8 +537,6 @@ void * serveclient(void * arg)
 		send_msg(fd, tempbuf);
 		snprintf(tempbuf, 512, "\r");
 		send_msg(fd, tempbuf);
-		//snprintf(tempbuf, 512, "\n\r\r\r");
-		//send_msg(fd, tempbuf);
 	}
 	prsoc("Bye!", fd);
 	snprintf(tempbuf2, 512, "\n");
@@ -536,9 +559,6 @@ void thread_spawn(struct th_data * arg, struct cinema * room)
 	arg->mycinema = room;
 	arg->th_cond = &thread_cond;
 	arg->th_mutex = &thread_mutex;
-	//arg->ctmutex = &chsxth;
-	//arg->ctcond = &cond;
-	//arg->messagep = peermsg;
 	if ((pthread_attr_init(&attr)) != 0) eonerror("pthread_attr_init fail");
 	if ((pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED)) != 0) eonerror("pthread_attr_setdetachstate() fail");
 	if ((pthread_create(&(arg->th_tid), &attr, &serveclient, arg)) != 0) eonerror("Error in pthread_create");
@@ -546,7 +566,7 @@ void thread_spawn(struct th_data * arg, struct cinema * room)
 	return;
 }
 
-int main(int argc, char * argv[])
+int main(int argc, char *argv[])
 {
 	struct timeval timeout;
 	timeout.tv_sec = 20;
@@ -554,40 +574,23 @@ int main(int argc, char * argv[])
 	
 	setvbuf(stdout, NULL, _IONBF, 0);
 	
-	//Getting terminal size
-    /*struct winsize w;
-    ioctl(0, TIOCGWINSZ, &w);
-	int trow = w.ws_row;
-	int tcol = w.ws_col;
-	*/
-	
 	socklen_t sockstr;
 	int listsock;
 	struct sockaddr_in servaddr;	
 	struct sockaddr_in clientaddr;
-	int port;
+	unsigned int port = 0;
 	int backlog = 0;
 	int socket_fd;
 	
 	struct th_data * new_thdata;
-	//client_t_struct *tmp;	
-	//pthread_t tid;
-	
-	//char dialogq;
+
 	char * chtemp;
 	
 	unsigned int crow;
 	unsigned int ccol;
 	struct cinema * room;
 	
-	prinf("C-nema server loading!");
 		
-	if (argc > 2) 
-	{
-		prerr("Usage: ./server <port>\t Default port if not specified: 4321");
-		eonerror("Too many CLI arguments");
-	}
-	
 	/* Setting input port. From man strtol:
 	 *
 	 * EINVAL (not in C99) The given base contains an unsupported value.
@@ -598,20 +601,14 @@ int main(int argc, char * argv[])
      * Valid TCP port range: 0 < port < 65536 (and 1-1024 could still fail if not run by root) 
 	 */
 	
-	if (argc == 2)
-	{	
-		port = strtol(argv[1], NULL, 10);
-		if ((errno == EINVAL) || (errno == ERANGE)) eonerror("Invalid port");
-		if ((port < 0) || (port >= 65536)) eonerror("Port out of range. Valid range: 1 - 65535 (1-1024 only as root)");
-		if (port == 0) port = 4321;
-		prinf("Port set to value ");
-		printf(ccia "%d\n", port);
-	}
-	else
+	ParseCmdLine(argc, argv, &port, &crow, &ccol);
+	prinf("C:nema server loading!\n");
+
+	if (port == 0)
 	{
 		port = 4321;
 		prinf("Port set to default value 4321.");
-		prinf("To change it, launch this server with ./server <port>\n");
+		prinf("To change it, launch this server with ./server -p <port>\n");
 	}	
 	
 
@@ -634,8 +631,7 @@ int main(int argc, char * argv[])
    	
    	if ((chtemp = malloc(sizeof(char) * 8)) == NULL) eonerror("malloc");
    	
-   	ccol = crow = 30;
-   	while (1 > 0)
+	if (ccol == 0) while (1 > 0)
    	{
 		printf(cbia "\tInsert column size\t[1 - %d]: ", MAX_COL);
 		if ((fgets(chtemp, 7, stdin)) == NULL) break;
@@ -644,7 +640,7 @@ int main(int argc, char * argv[])
 		else if ((ccol > 0)&&(ccol <= MAX_COL)) break;
 	}
 
-   	while (1 > 0)
+   	if (crow == 0) while (1 > 0)
    	{
 		printf("\tInsert row size\t\t[1 - %d]: ", MAX_ROW);
 		if ((fgets(chtemp, 7, stdin)) == NULL) break;
@@ -662,20 +658,17 @@ int main(int argc, char * argv[])
 	prinf("Room with size ");
    	printf(ccia "%dx%d" cver " created!", room->cols, room->rows);
    	
-	/* setting the listening socket */
 	listsock = socket(AF_INET, SOCK_STREAM, 0);
 	if (listsock < 0) eonerror("listening socket creation");
 	
-	/* setting the socket address data structure */
 	memset(&servaddr, 0, sizeof(servaddr));
 	servaddr.sin_family 		= AF_INET;
 	servaddr.sin_addr.s_addr	= htonl(INADDR_ANY);
 	servaddr.sin_port			= htons(port);
 
-	/* bind socket address to the listening socket */
     if (bind(listsock, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {
-		port = 1024;
+		port = 1;
 		prwar("An error occurred on bind(). Trying another port");
 		while(bind(listsock, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) 
 		{
@@ -685,41 +678,29 @@ int main(int argc, char * argv[])
 		}	
 	}
 	
-	
-	/* mark the socket as a listening socket */
 	if (listen(listsock, backlog) < 0) eonerror("listen error");
 
-	/* initializing the chanserv struct for managing requests */
-	//chanserv = alloc_cstruct();
-	//printf("[x]\tchanserver struct allocated - address is %p\n", (void *)chanserv);
 	int optval = 1;
 	if (setsockopt (listsock, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval)) < 0) eonerror ("setsockopt SO_REUSEPORT");
 	if (setsockopt (listsock, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)) < 0) eonerror ("setsockopt SO_KEEPALIVE");
-	/* starting infinite loop for responding client requests */
-	
+		
 	prinf("Server started at port ");
 	printf(ccia "%d\n", port);
 	while (1 > 0)
 	{
 		if (thread_count >= MAX_THR) pthread_cond_wait(&maxthread_cond, &maxthread_mutex);
-		prinf("Awaiting connections");
+		prinf("A new thread is awaiting for connections");
 
-		//tmp = alloc_tstruct();
 		sockstr = sizeof(struct sockaddr);
 		socket_fd = accept(listsock, (struct sockaddr *)&clientaddr, &sockstr);
 		if (setsockopt (socket_fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) eonerror ("setsockopt SO_RCVTIMEO");
 		if (setsockopt (socket_fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0) eonerror ("setsockopt SO_SNDTIMEO");
-		//if (tmp->fd < 0) eonerror("accept");
-		//pthread_create(&tid, NULL, chanserv_function, (void *)tmp);
 		prinf("Connection incoming!");
-		//serveclient(socket_fd, room);
 		new_thdata = malloc(sizeof(struct th_data));
 		if (new_thdata == NULL) eonerror("malloc thread data struct");
 		new_thdata->fd = socket_fd;
 		thread_count++;
 		thread_spawn(new_thdata, room);		
-		//prinf("Connection closed!");
-		
 	}
-	return 0;		
+	return (EXIT_FAILURE);		
 }

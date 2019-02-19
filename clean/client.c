@@ -1,10 +1,3 @@
-/*
-
-  TCPCLIENT.C
-  ==========
-
-*/
-
 #define cres  "\x1B[0m"
 #define cros  "\x1B[31m"
 #define cver  "\x1B[32m"
@@ -21,19 +14,15 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#include "client_helper.h"           /*  Our own helper functions  */
+#include "client_helper.h"    
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
 
-/*  Global constants  */
 
 #define MAX_LINE 1024
-
-
-/*  main()  */
 
 void prinf(const char * message){ printf(cver "\n[INFO]\t%s" cbia, message); }
 void prsoc(const char * message, int fd){ printf(ccia "\n[SOCK]\t%d says <%s>" cbia, fd, message); }
@@ -45,6 +34,25 @@ void eonerror(const char * message)
 	perror(message);
 	exit(EXIT_FAILURE);
 }
+int ParseCmdLine(int argc, char *argv[], char **szAddress, char **szPort)
+{
+    int n = 1;
+    while ( n < argc )
+	{
+		if 		( !strncmp(argv[n], "-a", 2) || !strncmp(argv[n], "-A", 2) ) *szAddress = argv[++n];
+		else if ( !strncmp(argv[n], "-p", 2) || !strncmp(argv[n], "-P", 2) ) *szPort = argv[++n];
+		else if ( !strncmp(argv[n], "-h", 2) || !strncmp(argv[n], "-H", 2) ) n = 99;
+		++n;
+    }
+	if ((argc==1)||(argc > 90))
+	{
+		prinf("Usage:");
+		prinf("\t./client -a <address> -p <port>  [-h]\n\n");
+		exit(EXIT_SUCCESS);
+	}
+    return 0;
+}
+
 int getfreeid(int fd)
 {
 	int exr;
@@ -63,20 +71,10 @@ int getfreeid(int fd)
 }
 int getidinfo(int fd, int id)
 {
-	//printf("fd = %d id = %d", fd, id);
 	int exr;
 	unsigned int outid = 0;
 	char buffer2[100];
-	//strcpy(buffer2, "g1");
 	snprintf(buffer2, 100, "g%u\n", id);
-	/*for(i = 0; i<sizeof(buffer2); i++) if (buffer2[i] == '.') 
-	{
-		buffer2[i] = '\0';
-		break;
-	}
-		
-	printf("\n#%s# size %d", buffer2, i);
-	*/
 	Writeline(fd, buffer2, strlen(buffer2));
     while(1 > 0)
 	{
@@ -85,7 +83,6 @@ int getidinfo(int fd, int id)
 		if ((errno == EINVAL) || (errno == ERANGE)) eonerror("Error getting reservation id's info");
 		if (exr == -1) break;
 	}
-	//printf("outid = %d", outid);
 	return outid;
 }
 void getanswer(char * command, int fd)
@@ -113,17 +110,16 @@ int mainmenu(int resno, int fd)
 	chtemp[0] = 'p';
 	if (resno == -1) 
 	{
-		printf(ccia"\n\t\t*------------------*\n\t\t|" cbia " C-NEMA Main Menu " ccia"|\n\t\t*------------------*\n" cbia "\n\tActually you're not working on a particular reservation id.\n\tWhat do you want to do?" ccia "\n\n\t[1]\tShow cinema status" cver "\n\t[2]\tWork on an existent reservation id" cgia"\n\t[3]\tOpen a new reservation" cmag "\n\t[4]\tClean up empty reservation ids" cbia "\n\n\t[5]\tExit from this client\n");
+		printf(ccia"\n\t\t*------------------*\n\t\t|" cbia " C:NEMA Main Menu " ccia"|\n\t\t*------------------*\n" cbia "\n\tActually you're not working on a particular reservation id.\n\tWhat do you want to do?" ccia "\n\n\t[1]\tShow cinema status" cver "\n\t[2]\tWork on an existent reservation id" cgia"\n\t[3]\tOpen a new reservation" cmag "\n\t[4]\tClean up empty reservation ids" cbia "\n\n\t[5]\tExit from this client\n");
 		
 		while (1 > 0)
 		{
-			printf(cbia"\nC-NEMA :> ");
+			printf(cbia"\nC:NEMA :> ");
 			if ((fgets(chtemp, 7, stdin)) == NULL) prerr("Invalid command");
 			command = strtol(chtemp, NULL, 10);
 			if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid command");
 			else if ((command > 0)&&(command <= 5)) break;
 		}
-		//printf("\nCommand:%d Resno:%d", command, resno);
 		if (command == 3) return getfreeid(fd);
 		if (command == 2) while (1 > 0)
 		{
@@ -135,16 +131,13 @@ int mainmenu(int resno, int fd)
 			if (getidinfo(fd, resno) == 0) prerr("Resource id not valid!");
 			else return resno;
 		}
-		//printf("\nCommand:%d resno:%d", command, resno);
 	}
-	//printf("\nCommand:%d RESNO:%d", command, resno);
 	if ((command == 0) && (resno != -1))
 	{
-		//printf("OK");
 		printf(cbia"\n\tYou're working on reservation" cver" #%d"cbia".\n\n\tWhat do you want to do about that?" ccia "\n\n\t[1]\tShow reserved seats" cver "\n\t[2]\tReserve specific seats\n\t[3]\tReserve some seats" cgia "\n\t[4]\tFree specific seats\n\t[5]\tFree some seats"cmag "\n\t[6]\tDelete this reservation\n\n\t" cbia "[7]\tGo back to main menu", resno);
 		while (1 > 0)
 		{
-			printf(cbia"\nC-NEMA :> ");
+			printf(cbia"\nC:NEMA :> ");
 			if ((fgets(chtemp, 7, stdin)) == NULL) prerr("Invalid command");
 			command = strtol(chtemp, NULL, 10);
 			if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid command");
@@ -163,7 +156,7 @@ int mainmenu(int resno, int fd)
 			getanswer(chtemp, fd);
 			return resno;
 		}
-		if (command == 2) //Reserve
+		if (command == 2)
 		{
 			char chtemp2[50];
 			unsigned int nseats = 0;
@@ -201,7 +194,7 @@ int mainmenu(int resno, int fd)
 			getanswer(chtemp, fd);
 			return resno;
 		}
-		if (command == 3) //Fill
+		if (command == 3)
 		{
 			while (1 > 0)
 			{
@@ -216,7 +209,7 @@ int mainmenu(int resno, int fd)
 		getanswer(chtemp, fd);
 		return resno;
 		}
-		if (command == 4) //Cancel
+		if (command == 4)
 		{
 			char chtemp2[50];
 			unsigned int nseats = 0;
@@ -253,7 +246,7 @@ int mainmenu(int resno, int fd)
 			getanswer(chtemp, fd);
 			return resno;
 		}
-		if (command == 5) //unFill
+		if (command == 5)
 		{
 			while (1 > 0)
 			{
@@ -282,12 +275,12 @@ int mainmenu(int resno, int fd)
 }
 int main(int argc, char *argv[])
 {
-    int       conn_s;                /*  connection socket         */
-    short int port;                  /*  port number               */
-    struct    sockaddr_in servaddr;  /*  socket address structure  */
-    char     *szAddress;             /*  Holds remote IP address   */
-    char     *szPort;                /*  Holds remote port         */
-    char     *endptr;                /*  for strtol()              */
+    int       conn_s;                
+    short int port;                  
+    struct    sockaddr_in servaddr;  
+    char     *saddr;             
+    char     *sport;                
+    char     *endptr;                
 	struct	  hostent *he;
 
 
@@ -296,26 +289,16 @@ int main(int argc, char *argv[])
 
     /*  Get command line arguments  */
 
-    ParseCmdLine(argc, argv, &szAddress, &szPort);
+    ParseCmdLine(argc, argv, &saddr, &sport);
 
 	/*  Set the remote port  */
 
-    port = strtol(szPort, &endptr, 0);
-    if ( *endptr )
-	{
-		printf("client: porta non riconosciuta.\n");
-		exit(EXIT_FAILURE);
-    }
+    port = strtol(sport, &endptr, 0);
+    if ( *endptr ) eonerror("Invalid port");
 	
-
     /*  Create the listening socket  */
 
-    if ( (conn_s = socket(AF_INET, SOCK_STREAM, 0)) < 0 )
-	{
-		fprintf(stderr, "client: errore durante la creazione della socket.\n");
-		exit(EXIT_FAILURE);
-    }
-
+    if ( (conn_s = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) eonerror("socket creation");
 
     /*  Set all bytes in socket address structure to
         zero, and fill in the relevant data members   */
@@ -325,75 +308,29 @@ int main(int argc, char *argv[])
 
     /*  Set the remote IP address  */
 
-    if ( inet_aton(szAddress, &servaddr.sin_addr) <= 0 )
+    if ( inet_aton(saddr, &servaddr.sin_addr) <= 0 )
 	{
-		printf("client: indirizzo IP non valido.\nclient: risoluzione nome...");
+		prinf("Not an IP. Trying resolving name");
 		
-		if ((he=gethostbyname(szAddress)) == NULL)
-		{
-			printf("fallita.\n");
-  			exit(EXIT_FAILURE);
-		}
-		printf("riuscita.\n\n");
+		if ((he=gethostbyname(saddr)) == NULL) eonerror("dns resolve failed");
+		printf("Name solved!.\n\n");
 		servaddr.sin_addr = *((struct in_addr *)he->h_addr);
     }
 	
-    
-    
-    /*  connect() to the remote echo server  */
-
-    if ( connect(conn_s, (struct sockaddr *) &servaddr, sizeof(servaddr) ) < 0 )
-	{
-		printf("client: errore durante la connect.\n");
-		exit(EXIT_FAILURE);
-    }
+    if ( connect(conn_s, (struct sockaddr *) &servaddr, sizeof(servaddr) ) < 0 ) eonerror("connect");
 
 
-int a = -1;
+	int a = -1;
 //int b = fork();
 /*if (b == 0) while(1 > 0)
 {
 	sleep(10);
 	Writeline(conn_s, "Ping!\n", 6);
 }*/
-while(1 > 0) a = mainmenu(a, conn_s);
-prwar("Server closed or not responding, exiting.");
-exit(EXIT_FAILURE);
+	while(1 > 0) a = mainmenu(a, conn_s);
+	
+	prwar("Server closed or not responding, exiting.");
+	exit(EXIT_FAILURE);
 }
 
-
-
-
-int ParseCmdLine(int argc, char *argv[], char **szAddress, char **szPort)
-{
-    int n = 1;
-
-    while ( n < argc )
-	{
-		if ( !strncmp(argv[n], "-a", 2) || !strncmp(argv[n], "-A", 2) )
-		{
-		    *szAddress = argv[++n];
-		}
-		else 
-			if ( !strncmp(argv[n], "-p", 2) || !strncmp(argv[n], "-P", 2) )
-			{
-			    *szPort = argv[++n];
-			}
-			else
-				if ( !strncmp(argv[n], "-h", 2) || !strncmp(argv[n], "-H", 2) )
-				{
-		    		printf("Sintassi:\n\n");
-			    	printf("    client -a (indirizzo server) -p (porta del server) [-h].\n\n");
-			    	exit(EXIT_SUCCESS);
-				}
-		++n;
-    }
-	if (argc==1)
-	{
-   		printf("Sintassi:\n\n");
-    	printf("    client -a (indirizzo server) -p (porta del server) [-h].\n\n");
-	    exit(EXIT_SUCCESS);
-	}
-    return 0;
-}
 

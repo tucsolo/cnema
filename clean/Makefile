@@ -14,18 +14,18 @@ client:
 	$(CC) $(CFLAGS) -o $(CLTARGET) $(CHEADERS) client*.c
 
 server:
-	$(CC) $(CFLAGS) -o $(SVTARGET) $(CHEADERS) server*.c $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $(SVTARGET) server*.c $(LDFLAGS)
 
 all:
 	$(CC) $(CFLAGS) -o $(CLTARGET) $(CHEADERS) client*.c
-	$(CC) $(CFLAGS) -o $(SVTARGET) $(CHEADERS) server*.c $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $(SVTARGET) server*.c $(LDFLAGS)
 
 clean:
 	rm $(CLTARGET) $(SVTARGET) $(OBFILES)
 
 help:
 	@echo	""
-	@echo	"	C-nema makefile"
+	@echo	"	C:nema makefile"
 	@echo	""
 	@echo	"	user@host:~/here$$ make client			builds client"
 	@echo	"	user@host:~/here$$ make server			builds server"
