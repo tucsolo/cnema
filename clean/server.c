@@ -16,15 +16,6 @@ Si precisa che la specifica richiede la realizzazione sia dell'applicazione clie
 Per progetti misti Unix/Windows e' a scelta quale delle due applicazioni sviluppare per uno dei due sistemi.
 */
 
-#define cres  "\x1B[0m"
-#define cros  "\x1B[31m"
-#define cver  "\x1B[32m"
-#define cgia  "\x1B[33m"
-#define cblu  "\x1B[34m"
-#define cmag  "\x1B[35m"
-#define ccia  "\x1B[36m"
-#define cbia  "\x1B[37m"
-
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -38,11 +29,8 @@ Per progetti misti Unix/Windows e' a scelta quale delle due applicazioni svilupp
 #include <time.h>
 #include <fcntl.h>
 #include <sys/select.h>
-
-#define MAX_COL 100
-#define MAX_ROW 100
-#define MAX_SEA 9000000
-#define MAX_THR 3000
+#include "messages.h"
+#include "server.h"
 
 int thread_count = 0;
 pthread_mutex_t thread_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -50,18 +38,6 @@ pthread_cond_t thread_cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t maxthread_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t maxthread_cond = PTHREAD_COND_INITIALIZER;
 
-void prinf(const char * message){ printf(cver "\n[INFO]\t%s" cbia, message); }
-void prsoc(const char * message, int fd){ printf(ccia "\n[SOCK]\t%d says <%s>" cbia, fd, message); }
-void prerr(const char * message){ printf(cros "\n[ERR!]\t%s" cbia, message); }
-void prwar(const char * message){ printf(cgia "\n[WARN]\t%s" cbia, message); }
-void eonerror(const char * message)
-{
-	printf(cros "\n[ERR!]\tFatal Error!" cbia);
-	perror(message);
-	exit(EXIT_FAILURE);
-}
-
-//void ParseCmdLine(int argc, char *argv[], unsigned int * port, unsigned int * row, unsigned int * col, char * infile, char * outfile)
 void ParseCmdLine(int argc, char *argv[], unsigned int * port, unsigned int * row, unsigned int * col)
 {
     int n = 1;
@@ -109,61 +85,6 @@ void ParseCmdLine(int argc, char *argv[], unsigned int * port, unsigned int * ro
 		++n;
     }
 }
-
-ssize_t Readline(int sockd, void *vptr, size_t maxlen)
-{
-
-    size_t n;
-	ssize_t rc;
-    char    c, *buffer;
-
-    buffer = vptr;
-
-    for ( n = 1; n < maxlen; n++ ) {
-		rc = read(sockd, &c, 1);
-		if ( rc == 1 ) {
-	    		*buffer++ = c;
-	    		if ( c == '\n' ) break;
-		}
-		else
-			if ( rc == 0 ) {
-			    if ( n == 1 ) return 0;
-			    else break;
-			}
-			else {
-			    if ( errno == EINTR ) continue;
-			    return -1;
-			}
-    }
-    *buffer = 0;
-    return n;
-}
-
-
-/*  Write a line to a socket  */
-
-ssize_t Writeline(int sockd, char *vptr)
-{
-	size_t		n = sizeof(vptr);
-    size_t      nleft;
-    ssize_t     nwritten;
-    const char *buffer;
-
-    buffer = vptr;
-    nleft  = n;
-
-    while ( nleft > 0 )
-	{
-		if ( (nwritten = write(sockd, buffer, nleft)) <= 0 )
-		{
-	    	if ( errno == EINTR ) nwritten = 0;
-		    else return -1;
-		}
-		nleft  -= nwritten;
-		buffer += nwritten;
-    }
-    return n;
-}
 size_t send_msg(int fd, char *buff)
 {
         size_t nleft = strlen(buff);
@@ -199,26 +120,6 @@ int recv_line(int sockfd, char *buf, int size)
 	buf[i-1] = '\0';
 	return i;
 }
-
-typedef struct cinema
-{
-		unsigned int rows;
-		unsigned int cols;
-		unsigned int * seat;
-		unsigned int * indexes;
-} cinema;
-
-typedef struct th_data
-{
-		pthread_mutex_t * th_mutex;
-		pthread_cond_t * th_cond;
-		pthread_t th_tid;
-		int fd;
-		struct cinema * mycinema;
-} th_data;
-
-
-
 struct cinema * initcinema(unsigned int cols, unsigned int rows)
 {
 	if ((rows > MAX_ROW)||(cols > MAX_COL)||(rows * cols > MAX_SEA)) eonerror("cinema size exceeded, srsly dunno how");
@@ -466,8 +367,6 @@ void checkzeros(struct cinema * room)
 		}
 	}
 }
-		
-	
 void * serveclient(void * arg)
 {
 	struct th_data * mydata = (struct th_data *) arg;
@@ -552,7 +451,6 @@ void * serveclient(void * arg)
 	pthread_mutex_unlock(&maxthread_mutex);
 	return 0;
 }
-
 void thread_spawn(struct th_data * arg, struct cinema * room)
 {
 	pthread_attr_t attr;
@@ -565,7 +463,6 @@ void thread_spawn(struct th_data * arg, struct cinema * room)
 	if ((pthread_attr_destroy(&attr)) != 0) eonerror ("Error in pthread_attr_destroy()");
 	return;
 }
-
 int main(int argc, char *argv[])
 {
 	struct timeval timeout;

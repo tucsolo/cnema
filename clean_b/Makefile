@@ -11,13 +11,13 @@ CLTARGET=client
 SVTARGET=server
 
 client:
-	$(CC) $(CFLAGS) -o $(CLTARGET) client* messages*
+	$(CC) $(CFLAGS) -o $(CLTARGET) client* messages* $(LDFLAGS)
 
 server:
 	$(CC) $(CFLAGS) -o $(SVTARGET) server* messages* $(LDFLAGS)
 
 all:
-	$(CC) $(CFLAGS) -o $(CLTARGET) client* messages*
+	$(CC) $(CFLAGS) -o $(CLTARGET) client* messages* $(LDFLAGS)
 	$(CC) $(CFLAGS) -o $(SVTARGET) server* messages* $(LDFLAGS)
 
 clean:

@@ -1,39 +1,19 @@
-#define cres  "\x1B[0m"
-#define cros  "\x1B[31m"
-#define cver  "\x1B[32m"
-#define cgia  "\x1B[33m"
-#define cblu  "\x1B[34m"
-#define cmag  "\x1B[35m"
-#define ccia  "\x1B[36m"
-#define cbia  "\x1B[37m"
-
 #include <sys/socket.h>       /*  socket definitions        */
 #include <sys/types.h>        /*  socket types              */
 #include <arpa/inet.h>        /*  inet (3) funtions         */
 #include <unistd.h>           /*  misc. UNIX functions      */
 #include <netinet/in.h>
 #include <netdb.h>
-
-#include "client_helper.h"    
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
 
+#include "messages.h"
+#include "client_helper.h"    
 
 #define MAX_LINE 1024
 
-void prinf(const char * message){ printf(cver "\n[INFO]\t%s" cbia, message); }
-void prsoc(const char * message, int fd){ printf(ccia "\n[SOCK]\t%d says <%s>" cbia, fd, message); }
-void prerr(const char * message){ printf(cros "\n[ERR!]\t%s" cbia, message); }
-void prwar(const char * message){ printf(cgia "\n[WARN]\t%s" cbia, message); }
-void eonerror(const char * message)
-{
-	printf(cros "\n[ERR!]\tFatal Error!" cbia);
-	perror(message);
-	exit(EXIT_FAILURE);
-}
 int ParseCmdLine(int argc, char *argv[], char **szAddress, char **szPort)
 {
     int n = 1;
@@ -52,7 +32,6 @@ int ParseCmdLine(int argc, char *argv[], char **szAddress, char **szPort)
 	}
     return 0;
 }
-
 int getfreeid(int fd)
 {
 	int exr;
@@ -123,12 +102,12 @@ int mainmenu(int resno, int fd)
 		if (command == 3) return getfreeid(fd);
 		if (command == 2) while (1 > 0)
 		{
-			printf(cbia "\nInsert reservation id: ");
+			printf(cbia "\nInsert reservation id [0 to exit]: ");
 			if ((fgets(chtemp, 7, stdin)) == NULL) prerr("Invalid resource id");
 			resno = strtol(chtemp, NULL, 10);
-			printf("\n%s-%d", chtemp, resno);
 			if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid resource id");
 			if (getidinfo(fd, resno) == 0) prerr("Resource id not valid!");
+			if (resno == 0) break;
 			else return resno;
 		}
 	}
@@ -185,10 +164,10 @@ int mainmenu(int resno, int fd)
 						if ((errno == EINVAL) || (errno == ERANGE)) prerr("Invalid command");
 						if (col >= 0) break;
 					}
-			if ((row == -1)||(col == -1)) break;
-			nseats++;
-			snprintf(chtemp2, 50, ",%d,%d", row,col);
-			chtemp = strcat(chtemp, chtemp2);
+				if ((row == -1)||(col == -1)) break;
+				nseats++;
+				snprintf(chtemp2, 50, ",%d,%d", row,col);
+				chtemp = strcat(chtemp, chtemp2);
 			}
 			chtemp = strcat(chtemp, ".\n");
 			getanswer(chtemp, fd);
