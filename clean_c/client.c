@@ -1,7 +1,13 @@
-#include <sys/socket.h>		/*  socket definitions        */
-#include <sys/types.h>		/*  socket types              */
-#include <arpa/inet.h>		/*  inet (3) funtions         */
-#include <unistd.h>		/*  misc. UNIX functions      */
+/*
+ * 
+ * C:NEMA project - client
+ * 
+ */
+
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdlib.h>
@@ -14,13 +20,27 @@
 #include "client_helper.h"
 #include "client.h"
 
-#define MAX_LINE 1024
-
 pthread_mutex_t thread_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t thread_cond = PTHREAD_COND_INITIALIZER;
 
 void *ping_client(void *arg)
 {
+	/*
+	 * ping thread main function
+	 * 
+	 * basically "pings" the server every 10 seconds
+	 * to keep connection alive.
+	 * 
+	 * It locks the communication mutex (to avoid
+	 * conflicts) and then sends "Ping!", waiting
+	 * for an answer (that is "Pong!" but with
+	 * getnullanswer(fd) it isn't stored anywhere.
+	 * Then unlocks the mutex and sleeps for 10,
+	 * 'till the end of the days (or a server
+	 * crash/client disconnection/whatever else)
+	 * 
+	 */
+
 	struct cth_data *mydata = (struct cth_data *)arg;
 	while (1 > 0) {
 		pthread_mutex_lock(&thread_mutex);
@@ -35,6 +55,14 @@ void *ping_client(void *arg)
 
 void cthread_spawn(struct cth_data *arg, int fd)
 {
+	/*
+	 * ping thread spawning function
+	 *
+	 * sets infos needed by ping thread
+	 * such as file descriptor, mutex addresses
+	 * (just in case)
+	 */
+
 	pthread_attr_t attr;
 	arg->th_cond = &thread_cond;
 	arg->th_mutex = &thread_mutex;
@@ -52,6 +80,13 @@ void cthread_spawn(struct cth_data *arg, int fd)
 
 int ParseCmdLine(int argc, char *argv[], char **szAddress, char **szPort)
 {
+	/*
+	 * Command-line args parsing function
+	 * 
+	 * checks if arguments are the right ones
+	 * (port and address) and stores them. 
+	 */
+
 	if (argc != 5) {
 		prinf("Usage:");
 		prinf("\t./client -a <address> -p <port>  [-h]\n\n");
@@ -78,6 +113,14 @@ int ParseCmdLine(int argc, char *argv[], char **szAddress, char **szPort)
 
 int getfreeid(int fd)
 {
+	/*
+	 * Asks for a reservation index to a server,
+	 * locking the mutex and sending the "y"
+	 * command. Once received an answer, stores
+	 * it and unlocks the mutex, returning the
+	 * reservation index given.
+	 */
+
 	int exr;
 	int outid = 0;
 	char buffer2[50];
@@ -93,13 +136,23 @@ int getfreeid(int fd)
 			break;
 	}
 	pthread_mutex_unlock(&thread_mutex);
-
+	if (outid == 0)
+		outid = -1;
 	return outid;
 
 }
 
 int getidinfo(int fd, int id)
 {
+	/*
+	 * Gets informations for the given index,
+	 * just to know if it is still valid
+	 * or it has been freed from the server
+	 * index pool, again locking the mutex, 
+	 * sending the "g[ID]" command and waiting
+	 * for the answer, returning it after having
+	 * unlocked the mutex.
+	 */
 	int exr;
 	unsigned int outid = 0;
 	char buffer2[100];
@@ -121,6 +174,15 @@ int getidinfo(int fd, int id)
 
 void getanswer(char *command, int fd)
 {
+	/*
+	 * Main function: sends a command
+	 * and prints server's answer.
+	 * Once again locking the mutex, sending
+	 * the command given in char *command and 
+	 * printing via printf the received answer,
+	 * unlocking the mutex and exiting with 
+	 * success if the command given is "x"
+	 */
 	int exr;
 	char *buffer2;
 	buffer2 = calloc(MAX_LINE, sizeof(char));
@@ -136,12 +198,21 @@ void getanswer(char *command, int fd)
 	}
 	pthread_mutex_unlock(&thread_mutex);
 
-	if (command[0] == 'x')
+	if (command[0] == 'x') {
+		prinf("Exiting, bye!");
 		exit(EXIT_SUCCESS);
+	}
 }
 
 void getnullanswer(int fd)
 {
+	/*
+	 * Used by ping_client function
+	 * just receives whatever message the
+	 * server sends and not storing it 
+	 * anywhere. Does not use mutexes.
+	 */
+
 	int exr;
 	char *buffer2;
 	buffer2 = calloc(MAX_LINE, sizeof(char));
@@ -157,6 +228,13 @@ void getnullanswer(int fd)
 
 int mainmenu(int resno, int fd)
 {
+	/*
+	 * Main menu function.
+	 * Basically controls the inputs that are sent to the
+	 * server.
+	 */
+
+	int tmres;
 	int seats;
 	char *chtemp;
 	int command = 0;
@@ -164,6 +242,9 @@ int mainmenu(int resno, int fd)
 	if (chtemp == NULL)
 		eonerror("malloc on temp char");
 	chtemp[0] = 'p';
+	/*
+	 * If you haven't got any reservation index
+	 */
 	if (resno == -1) {
 		printf(ccia "\n\n\n\t\t*------------------*\n\t\t|" cbia
 		       " C:NEMA Main Menu " ccia "|\n\t\t*------------------*\n"
@@ -185,8 +266,13 @@ int mainmenu(int resno, int fd)
 			else if ((command > 0) && (command <= 5))
 				break;
 		}
-		if (command == 3)
-			return getfreeid(fd);
+		if (command == 3) {
+			tmres = getfreeid(fd);
+			if (tmres == -1)
+				printf(cros
+				       "\n\n\tI'm sorry, there is no free reservation index.");
+			return tmres;
+		}
 		if (command == 2)
 			while (1 > 0) {
 				printf(cbia
@@ -204,6 +290,9 @@ int mainmenu(int resno, int fd)
 					return resno;
 			}
 	}
+	/*
+	 * If you are working on a reservation id
+	 */
 	if ((command == 0) && (resno != -1)) {
 		if (getidinfo(fd, resno) == 0) {
 			printf(cmag
@@ -398,6 +487,13 @@ int mainmenu(int resno, int fd)
 
 int main(int argc, char *argv[])
 {
+	/*
+	 * client main function
+	 * 
+	 * once variables are declared, set and checked
+	 * starts connection with the server, starts the ping 
+	 * client and starts the loop on the main menu.
+	 */
 	int conn_s;
 	short int port;
 	struct sockaddr_in servaddr;
@@ -414,28 +510,18 @@ int main(int argc, char *argv[])
 	timeout.tv_sec = 20;
 	timeout.tv_usec = 0;
 
-	/*  Get command line arguments  */
-
 	ParseCmdLine(argc, argv, &saddr, &sport);
-
-	/*  Set the remote port  */
 
 	port = strtol(sport, &endptr, 0);
 	if (*endptr)
 		eonerror("Invalid port");
 
-	/*  Create the listening socket  */
-
 	if ((conn_s = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 		eonerror("socket creation");
 
-	/*  Set all bytes in socket address structure to
-	   zero, and fill in the relevant data members   */
 	memset(&servaddr, 0, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(port);
-
-	/*  Set the remote IP address  */
 
 	if (inet_aton(saddr, &servaddr.sin_addr) <= 0) {
 		prinf("Not an IP. Trying resolving name");

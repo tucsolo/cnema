@@ -2,6 +2,14 @@
 #include <stdlib.h>
 #include "messages.h"
 
+/*
+ * Just some printf macros, used to 
+ * set colors and tags. 
+ * 
+ * Eonerror used to exit with failure
+ * when a fatal error occurs.
+ */
+
 void prinf(const char *message)
 {
 	printf(cver "\n[INFO]\t%s" cbia, message);

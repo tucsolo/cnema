@@ -33,14 +33,24 @@ Per progetti misti Unix/Windows e' a scelta quale delle due applicazioni svilupp
 #include "server.h"
 
 int thread_count = 0;
-//pthread_mutex_t thread_mutex = PTHREAD_MUTEX_INITIALIZER;
-//pthread_cond_t thread_cond = PTHREAD_COND_INITIALIZER;
+/*
+ * mutexes to allow only one thread 
+ * to work on common cinema struct.
+ */
+pthread_mutex_t thread_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t thread_cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t maxthread_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t maxthread_cond = PTHREAD_COND_INITIALIZER;
 
 void ParseCmdLine(int argc, char *argv[], unsigned int *port, unsigned int *row,
 		  unsigned int *col)
 {
+	/*
+	 * Command-line args parsing function
+	 * 
+	 * checks if arguments are the right ones
+	 * (port and size), legit, and stores them. 
+	 */
 	int n = 1;
 	*row = 0;
 	*col = 0;
@@ -98,6 +108,10 @@ void ParseCmdLine(int argc, char *argv[], unsigned int *port, unsigned int *row,
 
 size_t send_msg(int fd, char *buff)
 {
+	/*
+	 * Sends a string 
+	 * \r character used as excape/endline
+	 */
 	size_t nleft = strlen(buff);
 	ssize_t nsend = 0;
 	while (nleft > 0) {
@@ -117,6 +131,9 @@ size_t send_msg(int fd, char *buff)
 
 int recv_line(int sockfd, char *buf, int size)
 {
+	/*
+	 * Receives a string
+	 */
 	int i = 0;
 	char c = '\0';
 	int n;
@@ -136,6 +153,10 @@ int recv_line(int sockfd, char *buf, int size)
 
 struct cinema *initcinema(unsigned int cols, unsigned int rows)
 {
+	/*
+	 * Initializes a cinema structure and
+	 * returns its address.
+	 */
 	if ((rows > MAX_ROW) || (cols > MAX_COL) || (rows * cols > MAX_SEA))
 		eonerror("cinema size exceeded, srsly dunno how");
 	struct cinema *res;
@@ -143,8 +164,6 @@ struct cinema *initcinema(unsigned int cols, unsigned int rows)
 		eonerror("malloc cinema struct");
 	unsigned int *seats = calloc((cols * rows), sizeof(unsigned int));
 	unsigned int *index = calloc((cols * rows + 1), sizeof(unsigned int));
-	//unsigned int * seats = malloc((cols * rows) * sizeof(unsigned int));
-	//unsigned int * index = malloc((cols * rows + 1) * sizeof(unsigned int));
 	/*
 	 * using calloc as it sets memory to zero.
 	 * seat = row * columns + column
@@ -173,6 +192,11 @@ struct cinema *initcinema(unsigned int cols, unsigned int rows)
 
 void printcinema(struct cinema *room, unsigned int res_id, int fd)
 {
+	/*
+	 * prints cinema status for reservation res_id
+	 * 
+	 * if res_id = 0 prints a summary status
+	 */
 	char *tempmsg = calloc(512, sizeof(char));
 	if (tempmsg == NULL)
 		eonerror("calloc printcinema");
@@ -219,6 +243,9 @@ void printcinema(struct cinema *room, unsigned int res_id, int fd)
 
 void lindex(char *message, struct cinema *room, int fd)
 {
+	/*
+	 * invokes printcinema parsing the message
+	 */
 	int val = strtol(message + 1, NULL, 10);
 	printcinema(room, val, fd);
 }
@@ -226,6 +253,10 @@ void lindex(char *message, struct cinema *room, int fd)
 void fill(char *message, struct cinema *room, int fd, int places,
 	  unsigned int index)
 {
+	/*
+	 * fills with given places the reservation id 
+	 * index (or the one parsed from *message)
+	 */
 	unsigned int i = 0;
 	if (message != NULL) {
 		char *thischar;
@@ -255,6 +286,12 @@ void fill(char *message, struct cinema *room, int fd, int places,
 
 int reserve(char *message, struct cinema *room, int fd)
 {
+	/*
+	 * parses *message and reserves given places
+	 * to given reservation id. If places are valid
+	 * but assigned to someone else parses missing
+	 * places with fill command.
+	 */
 	unsigned int index, rem = 0;
 	int row, col;
 	char *lastchar;
@@ -287,6 +324,12 @@ int reserve(char *message, struct cinema *room, int fd)
 
 void unfill(char *message, struct cinema *room, int fd)
 {
+	/*
+	 * parses *message and frees given number
+	 * of seats from given reservation id,
+	 * checking if the reservation is still valid
+	 * (has at least one seat), otherwise deletes it
+	 */
 	unsigned int index, places, i = 0;
 	char *thischar;
 	index = strtol(message + 1, &thischar, 10);
@@ -312,6 +355,13 @@ void unfill(char *message, struct cinema *room, int fd)
 
 void cancels(char *message, struct cinema *room, int fd)
 {
+	/*
+	 * parses *message and deletes given places from
+	 * the given reservation, checking if the 
+	 * reservation is still valid (has at least 
+	 * one seat), otherwise deletes it
+	 */
+
 	unsigned int index, row, col;
 	char *lastchar;
 	char *thischar;
@@ -346,6 +396,10 @@ void cancels(char *message, struct cinema *room, int fd)
 
 void cancela(char *message, struct cinema *room, int fd)
 {
+	/*
+	 * Parses the message, deleting the given
+	 * reservation id and freeing it.
+	 */
 	unsigned int i, index;
 	char *thischar;
 	index = strtol(message + 1, &thischar, 10);
@@ -360,6 +414,10 @@ void cancela(char *message, struct cinema *room, int fd)
 
 int getindex(struct cinema *room)
 {
+	/*
+	 * Returns the first free reservation
+	 * index (0 if none are free)
+	 */
 	for (unsigned int i = 1; i < room->cols * room->cols + 1; i++)
 		if (room->indexes[i] == 0)
 			return i;
@@ -368,6 +426,11 @@ int getindex(struct cinema *room)
 
 int getindexinfo(char *message, struct cinema *room)
 {
+	/*
+	 * Parses the message, returning
+	 * the first free reservation index.
+	 * (0 if none are free)
+	 */
 	unsigned int index = 0;
 	char *thischar;
 	index = strtol(message + 1, &thischar, 10);
@@ -376,6 +439,10 @@ int getindexinfo(char *message, struct cinema *room)
 
 int lockindex(struct cinema *room)
 {
+	/*
+	 * Returns the first free reservation
+	 * index (0 if none are free), locking it
+	 */
 	for (unsigned int i = 1; i < room->cols * room->cols + 1; i++)
 		if (room->indexes[i] == 0) {
 			room->indexes[i] = 1;
@@ -386,6 +453,10 @@ int lockindex(struct cinema *room)
 
 void checkzeros(struct cinema *room)
 {
+	/*
+	 * Checks if there are empty 
+	 * reservations, freeing them.
+	 */
 	unsigned int i, j, e;
 	for (i = 1; i < room->cols * room->cols + 1; i++) {
 		if (room->indexes[i] != 0) {
@@ -403,6 +474,14 @@ void checkzeros(struct cinema *room)
 
 void *serveclient(void *arg)
 {
+	/*
+	 * main thread function
+	 * 
+	 * listens on the socket, waiting
+	 * for the messages to come and 
+	 * parsing them, answering and 
+	 * closing the connection in case
+	 */
 	struct th_data *mydata = (struct th_data *)arg;
 	struct cinema *room = mydata->mycinema;
 	int fd = mydata->fd;
@@ -455,7 +534,7 @@ void *serveclient(void *arg)
 				 cbia "\n\tx\t\tCloses connection\n\n");
 			send_msg(fd, tempbuf);
 		} else {
-			//pthread_mutex_lock(&thread_mutex);
+			pthread_mutex_lock(&thread_mutex);
 			if (tempbuf2[0] == 'l')
 				lindex(tempbuf2, room, fd);
 			if (tempbuf2[0] == 'r')
@@ -483,7 +562,7 @@ void *serveclient(void *arg)
 					 getindexinfo(tempbuf2, room));
 				send_msg(fd, tempbuf);
 			}
-			//pthread_mutex_unlock(&thread_mutex);
+			pthread_mutex_unlock(&thread_mutex);
 		}
 		snprintf(tempbuf, 512, "\n");
 		send_msg(fd, tempbuf);
@@ -508,10 +587,17 @@ void *serveclient(void *arg)
 
 void thread_spawn(struct th_data *arg, struct cinema *room)
 {
+	/*
+	 * client thread spawning function
+	 *
+	 * sets infos needed by client threads
+	 * such as file descriptor, mutex addresses
+	 * (just in case), cinema struct and so on
+	 */
 	pthread_attr_t attr;
 	arg->mycinema = room;
-	//arg->th_cond = &thread_cond;
-	//arg->th_mutex = &thread_mutex;
+	arg->th_cond = &thread_cond;
+	arg->th_mutex = &thread_mutex;
 	if ((pthread_attr_init(&attr)) != 0)
 		eonerror("pthread_attr_init fail");
 	if ((pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED)) != 0)
@@ -525,6 +611,13 @@ void thread_spawn(struct th_data *arg, struct cinema *room)
 
 int main(int argc, char *argv[])
 {
+	/*
+	 * server main function
+	 * 
+	 * once variables are declared, set and checked
+	 * starts listening on given port server, 
+	 * spawning new threads (if possible)
+	 */
 	struct timeval timeout;
 	timeout.tv_sec = 20;
 	timeout.tv_usec = 0;

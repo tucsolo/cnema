@@ -12,6 +12,10 @@
 
 int recv_line(int sockfd, char *buf, int size)
 {
+	/*
+	 * Receives a string from the server
+	 * \r character used as excape/endline
+	 */
 	int i = 0;
 	char c = '\r';
 	int n;
@@ -34,6 +38,9 @@ int recv_line(int sockfd, char *buf, int size)
 
 ssize_t Writeline(int sockd, const void *vptr, size_t n)
 {
+	/*
+	 * Sends a string to the server
+	 */
 	size_t nleft;
 	ssize_t nwritten;
 	const char *buffer;
